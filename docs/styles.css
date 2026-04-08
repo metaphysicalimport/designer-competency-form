@@ -458,6 +458,10 @@ textarea {
   width: 100%;
 }
 
+.action-row .loader-box {
+  width: 100%;
+}
+
 .button,
 .button-secondary,
 .button-ghost {
@@ -471,6 +475,17 @@ textarea {
   cursor: pointer;
 }
 
+.button-stroke {
+  background: var(--white);
+  color: var(--black);
+}
+
+.button-success {
+  background: #1f9d55;
+  border-color: #1f9d55;
+  color: var(--white);
+}
+
 .button-secondary {
   background: var(--white);
   color: var(--black);
@@ -479,6 +494,29 @@ textarea {
   font-size: 12px;
   line-height: 0.9;
   font-weight: 400;
+}
+
+.loader-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px solid var(--black);
+  background: var(--black);
+  color: var(--white);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.loader-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: var(--white);
+  border-radius: 999px;
+  animation: spin 0.9s linear infinite;
 }
 
 .button:disabled {
@@ -525,6 +563,12 @@ textarea {
 
 .footer-note {
   margin: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 719px) {

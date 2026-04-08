@@ -7,6 +7,7 @@ const TEXT_DOCUMENT_PATTERN = /\.(txt|md|markdown|csv|json|log|rtf|yaml|yml|xml|
 const BUNDLED_ATTACHMENT_ID = "builtin-product-designer-competencies";
 const BUNDLED_ATTACHMENT_NAME = "компетенции продуктового дизайнера.md";
 const BUNDLED_ATTACHMENT_URL = new URL("./product-designer-competencies.md", window.location.href).toString();
+const EVALUATION_API_URL = "/api/evaluate";
 
 const AXES = [
   {
@@ -255,6 +256,11 @@ const DEFAULT_STATE = {
   optionOrder: buildOptionOrderMap(),
   generalNotes: "",
   attachments: [],
+  evaluation: {
+    status: "idle",
+    fileName: "",
+    content: ""
+  },
   error: ""
 };
 
@@ -314,6 +320,10 @@ function loadState() {
       idealRatings: {
         ...cloneDefaultState().idealRatings,
         ...(parsed.idealRatings || {})
+      },
+      evaluation: {
+        ...cloneDefaultState().evaluation,
+        ...(parsed.evaluation || {})
       },
       attachments: Array.isArray(parsed.attachments)
         ? parsed.attachments.map(sanitizeAttachment).filter(Boolean)
@@ -377,6 +387,7 @@ function persistState() {
     profile: { ...state.profile },
     axes: JSON.parse(JSON.stringify(state.axes)),
     idealRatings: JSON.parse(JSON.stringify(state.idealRatings)),
+    evaluation: { ...state.evaluation },
     attachments: JSON.parse(JSON.stringify(state.attachments || [])),
     optionOrder: JSON.parse(JSON.stringify(state.optionOrder))
   };
@@ -496,7 +507,8 @@ function render() {
         <span class="mini-chip">${progress}% заполнено</span>
       </div>
       <div class="action-row">
-        <button class="button" id="export-markdown-button" type="button">экспортировать</button>
+        ${renderEvaluateAction()}
+        <button class="button button-stroke" id="export-markdown-button" type="button">экспортировать анкету</button>
       </div>
       <p class="footer-note">
         в файл попадут контекст оценки, вопросы, выбранные ответы, оценки по навыкам,
@@ -684,6 +696,31 @@ function renderIdealDesignerCard(section) {
   `;
 }
 
+function renderEvaluateAction() {
+  const evaluation = state.evaluation || cloneDefaultState().evaluation;
+
+  if (evaluation.status === "loading") {
+    return `
+      <div class="loader-box" aria-live="polite">
+        <span class="loader-spinner" aria-hidden="true"></span>
+        <span>готовим оценку...</span>
+      </div>
+    `;
+  }
+
+  if (evaluation.status === "done" && evaluation.content) {
+    return `
+      <button class="button button-success" id="download-evaluation-button" type="button">
+        скачать результат
+      </button>
+    `;
+  }
+
+  return `
+    <button class="button" id="evaluate-button" type="button">получить оценку</button>
+  `;
+}
+
 function renderAttachmentList() {
   const attachments = Array.isArray(state.attachments) ? state.attachments : [];
   if (!attachments.length) {
@@ -766,6 +803,16 @@ function attachEvents() {
     exportMarkdownButton.addEventListener("click", exportMarkdown);
   }
 
+  const evaluateButton = document.getElementById("evaluate-button");
+  if (evaluateButton) {
+    evaluateButton.addEventListener("click", requestEvaluation);
+  }
+
+  const downloadEvaluationButton = document.getElementById("download-evaluation-button");
+  if (downloadEvaluationButton) {
+    downloadEvaluationButton.addEventListener("click", downloadEvaluationResult);
+  }
+
   const resetFormButton = document.getElementById("reset-form-button");
   if (resetFormButton) {
     resetFormButton.addEventListener("click", resetForm);
@@ -816,6 +863,7 @@ function handleFieldInput(event) {
   }
 
   state.error = "";
+  clearEvaluationResult();
   if (!persistState()) {
     render();
   }
@@ -825,6 +873,7 @@ function handleEvidenceInput(event) {
   const axisId = event.target.dataset.evidenceAxis;
   state.axes[axisId].evidence = event.target.value;
   state.error = "";
+  clearEvaluationResult();
   if (!persistState()) {
     render();
   }
@@ -834,6 +883,7 @@ function handleRatingScoreChange(event) {
   const sectionId = event.target.dataset.ratingSection;
   state.idealRatings[sectionId].score = Number(event.target.value);
   state.error = "";
+  clearEvaluationResult();
   persistState();
   render();
 }
@@ -842,6 +892,7 @@ function handleRatingCommentInput(event) {
   const sectionId = event.target.dataset.ratingComment;
   state.idealRatings[sectionId].comment = event.target.value;
   state.error = "";
+  clearEvaluationResult();
   if (!persistState()) {
     render();
   }
@@ -864,6 +915,7 @@ function handleAxisSelectionToggle(event) {
     .map((level) => axisConfig?.options?.[level] || "")
     .filter(Boolean);
   state.error = "";
+  clearEvaluationResult();
   persistState();
   render();
 }
@@ -877,6 +929,7 @@ async function handleAttachmentUpload(event) {
 
   const previousAttachments = Array.isArray(state.attachments) ? [...state.attachments] : [];
   state.error = "";
+  clearEvaluationResult();
 
   try {
     const invalidFile = files.find((file) => !isTextDocument(file));
@@ -913,8 +966,71 @@ function handleAttachmentRemove(event) {
     (state.attachments || []).filter((attachment) => attachment.id !== attachmentId)
   );
   state.error = "";
+  clearEvaluationResult();
   persistState();
   render();
+}
+
+async function requestEvaluation() {
+  const cardMarkdown = buildMarkdownExport();
+  state.error = "";
+  state.evaluation = {
+    status: "loading",
+    fileName: "",
+    content: ""
+  };
+  persistState();
+  render();
+
+  try {
+    const response = await fetch(EVALUATION_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        card_markdown: cardMarkdown
+      })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.error || "не удалось получить оценку.");
+    }
+
+    state.evaluation = {
+      status: "done",
+      fileName: payload.file_name || "designer-assessment-result.md",
+      content: String(payload.content || "")
+    };
+    state.error = "";
+  } catch (error) {
+    state.evaluation = {
+      status: "idle",
+      fileName: "",
+      content: ""
+    };
+    state.error = error.message || "не удалось получить оценку.";
+  }
+
+  persistState();
+  render();
+}
+
+function downloadEvaluationResult() {
+  const evaluation = state.evaluation || {};
+  if (!evaluation.content) {
+    state.error = "результат оценки пока недоступен.";
+    persistState();
+    render();
+    return;
+  }
+
+  downloadTextFile(
+    evaluation.fileName || "designer-assessment-result.md",
+    evaluation.content,
+    "text/markdown;charset=utf-8"
+  );
 }
 
 function exportMarkdown() {
@@ -1046,6 +1162,14 @@ function buildMarkdownExport() {
 function buildExportFileName() {
   const designerName = state.profile.designerName || "designer";
   return `designer-review-${slugifyFileName(designerName)}.md`;
+}
+
+function clearEvaluationResult() {
+  state.evaluation = {
+    status: "idle",
+    fileName: "",
+    content: ""
+  };
 }
 
 function slugifyFileName(value) {
