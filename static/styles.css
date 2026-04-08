@@ -34,10 +34,10 @@ body {
 }
 
 .shell {
-  width: min(100%, 712px);
+  width: min(100%, 1280px);
   min-height: 100dvh;
   margin: 0 auto;
-  padding: 24px 16px 40px;
+  padding: 24px 24px 40px;
 }
 
 .hero {
@@ -579,9 +579,9 @@ textarea {
 
 @media (max-width: 719px) {
   .shell {
-    width: min(100%, 704px);
+    width: 100%;
     padding-top: 16px;
-    padding-inline: 12px;
+    padding-inline: 16px;
   }
 
   #app {
