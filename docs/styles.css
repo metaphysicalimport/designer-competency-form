@@ -171,7 +171,9 @@ h3 {
 }
 
 .auth-gate {
-  max-width: 480px;
+  width: min(100%, 480px);
+  margin: 0 auto;
+  justify-self: center;
 }
 
 .auth-gate-head {
