@@ -427,6 +427,10 @@ function render() {
       </div>
     </section>
 
+    <section class="section-divider">
+      <h2 class="section-divider-title">общая оценка</h2>
+    </section>
+
     ${AXES.map(renderAxisCard).join("")}
 
     <section class="section-divider">
@@ -821,7 +825,7 @@ function buildMarkdownExport() {
     "",
     formatParagraph(state.profile.context),
     "",
-    "## основные вопросы",
+    "## общая оценка",
     ""
   ];
 
