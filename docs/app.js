@@ -1024,7 +1024,7 @@ async function requestEvaluation() {
 
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(payload.error || "не удалось получить оценку.");
+      throw new Error(extractOpenAIErrorMessage(payload, response.status));
     }
 
     state.evaluation = {
@@ -1039,12 +1039,17 @@ async function requestEvaluation() {
 
     state.error = "";
   } catch (error) {
+    const errorMessage =
+      error instanceof TypeError
+        ? "браузер не смог отправить запрос в OpenAI. проверь сеть, доступность api.openai.com и возможную блокировку по региону."
+        : error.message || "не удалось получить оценку.";
+
     state.evaluation = {
       status: "idle",
       fileName: "",
       content: ""
     };
-    state.error = error.message || "не удалось получить оценку.";
+    state.error = errorMessage;
   }
 
   persistState();
@@ -1255,6 +1260,25 @@ function extractEvaluationText(payload) {
   });
 
   return parts.join("\n").trim();
+}
+
+function extractOpenAIErrorMessage(payload, status) {
+  const apiError = payload?.error;
+  if (typeof apiError === "string" && apiError.trim()) {
+    return apiError;
+  }
+
+  if (apiError && typeof apiError === "object") {
+    const message = String(apiError.message || "").trim();
+    const code = String(apiError.code || "").trim();
+    const type = String(apiError.type || "").trim();
+    const parts = [message, code, type].filter(Boolean);
+    if (parts.length) {
+      return parts.join(" | ");
+    }
+  }
+
+  return `не удалось получить оценку. статус ответа: ${status}`;
 }
 
 function slugifyFileName(value) {
