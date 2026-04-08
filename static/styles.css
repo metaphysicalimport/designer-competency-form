@@ -252,6 +252,7 @@ textarea {
 input[type="text"]::placeholder,
 textarea::placeholder {
   color: var(--black-56);
+  font-weight: 500;
 }
 
 input[type="text"]:focus,
@@ -267,6 +268,9 @@ select {
 textarea {
   min-height: 112px;
   resize: vertical;
+  font-size: 16px;
+  line-height: 1.65;
+  font-weight: 500;
 }
 
 .axis-head {
@@ -347,8 +351,9 @@ textarea {
 
 .grade-copy span {
   color: var(--black);
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 16px;
+  line-height: 1.65;
+  font-weight: 500;
 }
 
 .action-row {
