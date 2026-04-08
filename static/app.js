@@ -1,4 +1,6 @@
 const STORAGE_KEY = "designer-competency-app-v5";
+const ACCESS_KEY = "designer-competency-access-v1";
+const ACCESS_PASSWORD_HASH = "86de771b3bc9b99e47eff4e3dfa414a0d33b630c0299740465b5e018e3bc96af";
 const OPTION_LABELS = ["a", "b", "c", "d", "e"];
 const GRADE_OPTIONS = ["14", "15", "16", "17", "18"];
 
@@ -253,11 +255,33 @@ const DEFAULT_STATE = {
 
 let state = loadState();
 const app = document.getElementById("app");
+let hasAccess = getStoredAccess();
+let authError = "";
 
 init();
 
 function init() {
   render();
+}
+
+function getStoredAccess() {
+  try {
+    return sessionStorage.getItem(ACCESS_KEY) === "granted";
+  } catch (error) {
+    return false;
+  }
+}
+
+function setStoredAccess(isGranted) {
+  try {
+    if (isGranted) {
+      sessionStorage.setItem(ACCESS_KEY, "granted");
+    } else {
+      sessionStorage.removeItem(ACCESS_KEY);
+    }
+  } catch (error) {
+    return;
+  }
 }
 
 function loadState() {
@@ -358,6 +382,12 @@ function getAnsweredCount() {
 }
 
 function render() {
+  if (!hasAccess) {
+    renderAccessGate();
+    attachAccessGateEvents();
+    return;
+  }
+
   const answeredCount = getAnsweredCount();
   const totalCount = AXES.length + IDEAL_DESIGNER_SECTIONS.length;
   const progress = Math.round((answeredCount / totalCount) * 100);
@@ -429,6 +459,27 @@ function render() {
   `;
 
   attachEvents();
+}
+
+function renderAccessGate() {
+  app.innerHTML = `
+    <section class="auth-gate">
+      <div class="auth-gate-head">
+        <h2>доступ к анкете</h2>
+        <p class="field-help">введи пароль, чтобы открыть форму оценки.</p>
+      </div>
+      <form class="auth-form" id="access-form">
+        <div class="field">
+          <label for="access-password">пароль</label>
+          <input id="access-password" name="password" type="password" autocomplete="current-password" />
+        </div>
+        <div class="action-row">
+          <button class="button" type="submit">открыть анкету</button>
+        </div>
+        ${authError ? `<section class="error-box">${escapeHtml(authError)}</section>` : ""}
+      </form>
+    </section>
+  `;
 }
 
 function renderInput(fieldId, label, value, placeholder) {
@@ -634,6 +685,38 @@ function attachEvents() {
   }
 }
 
+function attachAccessGateEvents() {
+  const accessForm = document.getElementById("access-form");
+  if (accessForm) {
+    accessForm.addEventListener("submit", handleAccessSubmit);
+  }
+}
+
+async function handleAccessSubmit(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const passwordInput = form.querySelector('input[name="password"]');
+  const password = String(passwordInput?.value || "");
+
+  if (!password) {
+    authError = "введи пароль.";
+    render();
+    return;
+  }
+
+  const passwordHash = await hashPassword(password);
+  if (passwordHash !== ACCESS_PASSWORD_HASH) {
+    authError = "неверный пароль.";
+    render();
+    return;
+  }
+
+  authError = "";
+  hasAccess = true;
+  setStoredAccess(true);
+  render();
+}
+
 function handleFieldInput(event) {
   const path = event.target.dataset.field;
   if (!path.includes(".")) {
@@ -715,6 +798,18 @@ function resetForm() {
   state = cloneDefaultState();
   persistState();
   render();
+}
+
+async function hashPassword(value) {
+  if (!window.crypto?.subtle) {
+    return value === "MPD-26" ? ACCESS_PASSWORD_HASH : "";
+  }
+
+  const data = new TextEncoder().encode(value);
+  const hashBuffer = await window.crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 function buildMarkdownExport() {
