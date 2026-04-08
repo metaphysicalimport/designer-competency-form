@@ -170,6 +170,11 @@ h3 {
   padding: var(--space-4);
 }
 
+.profile-card--plain {
+  border: 0;
+  background: transparent;
+}
+
 .auth-gate {
   width: min(100%, 480px);
   margin: 0 auto;
