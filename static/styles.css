@@ -474,6 +474,10 @@ textarea {
 .button,
 .button-secondary,
 .button-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   appearance: none;
   border: 1px solid var(--black);
   background: var(--black);
@@ -482,6 +486,12 @@ textarea {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+}
+
+.button-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
 }
 
 .button-stroke {
