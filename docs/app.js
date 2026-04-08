@@ -429,12 +429,8 @@ function render() {
 
     ${AXES.map(renderAxisCard).join("")}
 
-    <section class="profile-card profile-card--plain">
-      <h2>дополнительная оценка по навыкам</h2>
-      <p class="field-help">
-        ниже добавлены блоки по ключевым навыкам. Для каждого навыка поставь оценку
-        от 1 до 5 и оставь свободный комментарий.
-      </p>
+    <section class="section-divider">
+      <h2 class="section-divider-title">оценка по навыкам</h2>
     </section>
 
     ${renderIdealDesignerSections()}
@@ -859,7 +855,7 @@ function buildMarkdownExport() {
     lines.push("");
   });
 
-  lines.push("## дополнительная оценка по навыкам");
+  lines.push("## оценка по навыкам");
   lines.push("");
 
   let currentStage = "";
