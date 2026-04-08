@@ -541,7 +541,7 @@ function renderIdealDesignerSections() {
               </p>
             `
             : ""}
-          <h3 class="subsection-title">${escapeHtml(stage)}</h3>
+          <h2 class="subsection-title">${escapeHtml(stage)}</h2>
           <div class="ideal-stack">
             ${sections.map(renderIdealDesignerCard).join("")}
           </div>

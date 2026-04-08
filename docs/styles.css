@@ -73,9 +73,12 @@ h3 {
 
 .subsection-title {
   margin-top: 0;
-  color: var(--black-72);
-  font-size: 13px;
-  font-weight: 500;
+  color: var(--black);
+  font-size: clamp(18px, 3vw, 24px);
+  font-weight: 600;
+  line-height: 1.04;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--black);
 }
 
 .field-help,
