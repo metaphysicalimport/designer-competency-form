@@ -439,7 +439,7 @@ function render() {
       </p>
       <div class="textarea-field">
         <label for="general-notes">комментарий</label>
-        <textarea id="general-notes" data-field="generalNotes" placeholder="например: вел сложный редизайн, хорошо держит коммуникацию с pm, но пока неустойчив в problem framing без внешней рамки.">${escapeHtml(state.generalNotes)}</textarea>
+        <textarea id="general-notes" data-field="generalNotes" placeholder="например: сильные стороны, зоны роста, важные наблюдения, сомнения по калибровке или дополнительные сигналы, которые стоит учесть в оценке.">${escapeHtml(state.generalNotes)}</textarea>
       </div>
     </section>
 
