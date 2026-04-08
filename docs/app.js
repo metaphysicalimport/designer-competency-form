@@ -1,5 +1,5 @@
 const STORAGE_KEY = "designer-competency-app-v5";
-const OPTION_LABELS = ["A", "B", "C", "D", "E"];
+const OPTION_LABELS = ["a", "b", "c", "d", "e"];
 const GRADE_OPTIONS = ["14", "15", "16", "17", "18"];
 
 const AXES = [
@@ -12,7 +12,7 @@ const AXES = [
       14: "уверенно работает с понятными задачами внутри проекта, где ясны цель, рамки и ожидаемый результат",
       15: "может самостоятельно разобраться в не до конца ясной задаче внутри проекта и довести ее до результата",
       16: "может вести крупные куски проекта в рамках своей кроссфункциональной команды - с по, пи-эмом, разработкой и кью-эй",
-      17: "может тянуть проект целиком или его ключевую часть внутри Музыки, от которой зависит заметный результат для продукта или бизнеса",
+      17: "может тянуть проект целиком или его ключевую часть внутри музыки, от которой зависит заметный результат для продукта или бизнеса",
       18: "может начинать движение в зоне высокой неопределенности, когда еще неясно, какая задача, проект или направление вообще нужны и что именно стоит делать"
     }
   },
@@ -27,7 +27,7 @@ const AXES = [
       15: "если задача сформулирована не до конца, помогает ее уточнить и собрать рабочую рамку перед стартом",
       16: "внутри проекта сам предлагает, какие задачи стоит делать, и формулирует варианты решения",
       17: "инициирует новые задачи или крупные куски работы внутри проекта, если видит проблему или возможность роста",
-      18: "может инициировать отдельный проект или новое направление и доказывать его значимость для Музыки, Фантеха или бизнеса"
+      18: "может инициировать отдельный проект или новое направление и доказывать его значимость для музыки, фантеха или бизнеса"
     }
   },
   {
@@ -50,10 +50,10 @@ const AXES = [
     prompts: [],
     options: {
       14: "его решения влияют на отдельную задачу внутри проекта - экран, сценарий, состояние или кусок флоу",
-      15: "его решения влияют на заметную часть проекта и на работу своей кроссфункциональной команды внутри Музыки",
-      16: "его решения влияют на проект целиком или на несколько команд внутри Музыки",
-      17: "его решения влияют на ключевые подходы, большие продуктовые области или приоритеты внутри Музыки",
-      18: "его решения влияют за пределами Музыки - на Фантех или на более широкий контур компании"
+      15: "его решения влияют на заметную часть проекта и на работу своей кроссфункциональной команды внутри музыки",
+      16: "его решения влияют на проект целиком или на несколько команд внутри музыки",
+      17: "его решения влияют на ключевые подходы, большие продуктовые области или приоритеты внутри музыки",
+      18: "его решения влияют за пределами музыки - на фантех или на более широкий контур компании"
     }
   },
   {
@@ -67,33 +67,33 @@ const AXES = [
       15: "самостоятельно принимает решения внутри своей задачи или зоны ответственности",
       16: "держит качество и целостность крупного куска проекта от начала до конца, а не только свою локальную часть",
       17: "думает о последствиях решений во времени - что будет после релиза, как решение поведет себя дальше и к чему приведет",
-      18: "берет оунершип не только за выполнение задач, но и за качество проектного направления, приоритеты и общую силу решений в своей зоне или на уровне Музыки"
+      18: "берет оунершип не только за выполнение задач, но и за качество проектного направления, приоритеты и общую силу решений в своей зоне или на уровне музыки"
     }
   },
   {
     id: "interaction_and_influence",
     title: "взаимодействие и влияние",
-    description: "как дизайнер влияет на решения других людей - внутри своей задачи, кроссфункциональной команды, проекта, Музыки и шире",
+    description: "как дизайнер влияет на решения других людей - внутри своей задачи, кроссфункциональной команды, проекта, музыки и шире",
     prompts: [],
     options: {
       14: "коммуницирует по своим задачам и рабочим решениям внутри кроссфункциональной команды",
       15: "может аргументировать свои решения и договариваться с по, пи-эмом, разработкой и кью-эй в рамках проекта",
       16: "влияет на решения своей кроссфункциональной команды и помогает ей принимать более сильные продуктовые решения",
-      17: "может продвигать и удерживать важные решения на уровне проекта, нескольких команд или больших продуктовых тем внутри Музыки",
-      18: "формирует подходы, принципы и рамки, на которые начинают опираться другие команды внутри Музыки, Фантеха или шире"
+      17: "может продвигать и удерживать важные решения на уровне проекта, нескольких команд или больших продуктовых тем внутри музыки",
+      18: "формирует подходы, принципы и рамки, на которые начинают опираться другие команды внутри музыки, фантеха или шире"
     }
   },
   {
     id: "superpower",
     title: "суперсила",
-    description: "в чем дизайнер дает наибольшее усиление - на уровне задачи, своей команды, проекта, Музыки или шире",
+    description: "в чем дизайнер дает наибольшее усиление - на уровне задачи, своей команды, проекта, музыки или шире",
     prompts: [],
     options: {
       14: "у дизайнера есть выраженная сильная сторона, которая заметно усиливает качество конкретных задач и решений",
       15: "к его экспертизе регулярно обращаются внутри кроссфункциональной команды - за советом, оценкой или более сильным решением",
-      16: "его сильная сторона заметно усиливает проект целиком или несколько команд внутри Музыки, а не только его собственный участок работы",
-      17: "его сильная сторона влияет на то, как работает команда или дизайн внутри Музыки - как думают, принимают решения или собирают качество",
-      18: "его сильная сторона выходит за рамки Музыки и начинает влиять на подходы, дизайн-культуру или продуктовые решения на уровне Фантеха или шире"
+      16: "его сильная сторона заметно усиливает проект целиком или несколько команд внутри музыки, а не только его собственный участок работы",
+      17: "его сильная сторона влияет на то, как работает команда или дизайн внутри музыки - как думают, принимают решения или собирают качество",
+      18: "его сильная сторона выходит за рамки музыки и начинает влиять на подходы, дизайн-культуру или продуктовые решения на уровне фантеха или шире"
     }
   }
 ];
@@ -101,8 +101,8 @@ const AXES = [
 const IDEAL_DESIGNER_SECTIONS = [
   {
     id: "idea_generation_ux",
-    stage: "На этапе поиска решений",
-    title: "Генерация идей + сценарии / ю-икс",
+    stage: "на этапе поиска решений",
+    title: "генерация идей + сценарии / ю-икс",
     bullets: [
       "умеет включать хеликоптер вью и видеть картину целиком",
       "разгоняет не только идеи, но и альтернативные сценарии реализации",
@@ -112,8 +112,8 @@ const IDEAL_DESIGNER_SECTIONS = [
   },
   {
     id: "aesthetics_ui",
-    stage: "На этапе поиска решений",
-    title: "Эстетика / ю-ай",
+    stage: "на этапе поиска решений",
+    title: "эстетика / ю-ай",
     bullets: [
       "не обесценивает значение метрики эстетик-юзабилити эффект",
       "обеспечивает связь и консистентность продукта и бренда",
@@ -124,8 +124,8 @@ const IDEAL_DESIGNER_SECTIONS = [
   },
   {
     id: "user_research",
-    stage: "На этапе поиска решений",
-    title: "Юзер рисерч",
+    stage: "на этапе поиска решений",
+    title: "юзер рисерч",
     bullets: [
       "умеет спланировать рисерч: гипотезы, план, скрипт, формат (интервью, опросы)",
       "синтезирует инсайты в понятные рекомендации",
@@ -134,8 +134,8 @@ const IDEAL_DESIGNER_SECTIONS = [
   },
   {
     id: "frameworks_analytics",
-    stage: "На этапе поиска решений",
-    title: "Фреймворки / аналитика",
+    stage: "на этапе поиска решений",
+    title: "фреймворки / аналитика",
     bullets: [
       "умеет связать дизайн с целями и метриками продукта",
       "применяет райс и другие фреймворки для фокусировки продуктовой команды и ранжирования идей",
@@ -144,16 +144,16 @@ const IDEAL_DESIGNER_SECTIONS = [
   },
   {
     id: "design_pitching",
-    stage: "На этапе поиска решений",
-    title: "Дизайн питчинг",
+    stage: "на этапе поиска решений",
+    title: "дизайн питчинг",
     bullets: [
       "умеет эффективно защищать свои решения перед стейкхолдерами и командой"
     ]
   },
   {
     id: "empathy_compromises",
-    stage: "На этапе поиска решений",
-    title: "Эмпатия и компромиссы",
+    stage: "на этапе поиска решений",
+    title: "эмпатия и компромиссы",
     bullets: [
       "умеет находить компромиссы, которые сохраняют целевую планку качества реализации",
       "умеет искать возможности обойти блокеры внутри команды, не просаживая качество"
@@ -161,8 +161,8 @@ const IDEAL_DESIGNER_SECTIONS = [
   },
   {
     id: "work_speed",
-    stage: "На этапе детализации макетов",
-    title: "Скорость работы",
+    stage: "на этапе детализации макетов",
+    title: "скорость работы",
     bullets: [
       "регулярно обучается и повышает свою эффективность",
       "использует нетривиальные подходы и инструменты, чтобы быстрее достигать нужного результата"
@@ -170,8 +170,8 @@ const IDEAL_DESIGNER_SECTIONS = [
   },
   {
     id: "flow_detailing",
-    stage: "На этапе детализации макетов",
-    title: "Проработка флоу",
+    stage: "на этапе детализации макетов",
+    title: "проработка флоу",
     bullets: [
       "описывает и отрисовывает все состояния, ошибки и пограничные кейсы",
       "сам или в коллаборации с редактором формулирует микрокопирайт",
@@ -181,8 +181,8 @@ const IDEAL_DESIGNER_SECTIONS = [
   },
   {
     id: "handoff_and_production",
-    stage: "На этапе детализации макетов",
-    title: "Хэнд-офф и ответственность за прод",
+    stage: "на этапе детализации макетов",
+    title: "хэнд-офф и ответственность за прод",
     bullets: [
       "проводит дизайн-ревью по ходу разработки фичи",
       "контролирует, что продакшн совпадает с макетами на 99%",
@@ -191,8 +191,8 @@ const IDEAL_DESIGNER_SECTIONS = [
   },
   {
     id: "critique_response",
-    stage: "На этапе детализации макетов",
-    title: "Критик респонс",
+    stage: "на этапе детализации макетов",
+    title: "критик респонс",
     bullets: [
       "спокойно принимает фидбэк, отделяет личное от рабочего",
       "умеет корректировать свои решение после фидбека"
@@ -348,7 +348,7 @@ function render() {
       <div class="progress-dock-head">
         <div class="progress-dock-actions">
           <span class="mini-chip">${progress}% заполнено</span>
-          <button class="button button-secondary" id="reset-form-button" type="button">Сбросить форму</button>
+          <button class="button button-secondary" id="reset-form-button" type="button">сбросить форму</button>
         </div>
         <span class="progress-copy">заполнено ${answeredCount} из ${totalCount} блоков</span>
       </div>
@@ -358,23 +358,23 @@ function render() {
     </section>
 
     <section class="profile-card">
-      <h2>Контекст оценки</h2>
+      <h2>контекст оценки</h2>
       <div class="field-grid">
-        ${renderInput("designerName", "Дизайнер", state.profile.designerName, "Например, Алина")}
+        ${renderInput("designerName", "дизайнер", state.profile.designerName, "например, алина")}
         ${renderInput(
           "designerRole",
-          "Роль дизайнера",
+          "роль дизайнера",
           state.profile.designerRole,
-          "Например, старший дизайнер продукта"
+          "например, старший дизайнер продукта"
         )}
       </div>
       <div class="field-grid field-grid--double">
-        ${renderSelect("currentGrade", "Текущий формальный грейд", state.profile.currentGrade, GRADE_OPTIONS)}
-        ${renderSelect("targetGrade", "Целевой грейд", state.profile.targetGrade, GRADE_OPTIONS)}
+        ${renderSelect("currentGrade", "текущий формальный грейд", state.profile.currentGrade, GRADE_OPTIONS)}
+        ${renderSelect("targetGrade", "целевой грейд", state.profile.targetGrade, GRADE_OPTIONS)}
       </div>
       <div class="textarea-field">
-        <label for="profile-context">Контекст команды и зоны ответственности дизайнера</label>
-        <textarea id="profile-context" data-field="profile.context" placeholder="Опиши продукт, команду, тип задач дизайнера, уровень автономности, с кем он взаимодействует, за что отвечает.">${escapeHtml(state.profile.context)}</textarea>
+        <label for="profile-context">контекст команды и зоны ответственности дизайнера</label>
+        <textarea id="profile-context" data-field="profile.context" placeholder="опиши продукт, команду, тип задач дизайнера, уровень автономности, с кем он взаимодействует, за что отвечает.">${escapeHtml(state.profile.context)}</textarea>
       </div>
     </section>
 
@@ -383,14 +383,14 @@ function render() {
     ${renderIdealDesignerSections()}
 
     <section class="profile-card">
-      <h2>Дополнительные заметки</h2>
+      <h2>дополнительные заметки</h2>
       <p class="field-help">
-        Сюда можно добавить крупные кейсы, сомнения по калибровке, сильные стороны,
-        обратную связь от PM или разработки и любые наблюдения, которые важно не потерять.
+        сюда можно добавить крупные кейсы, сомнения по калибровке, сильные стороны,
+        обратную связь от pm или разработки и любые наблюдения, которые важно не потерять.
       </p>
       <div class="textarea-field">
-        <label for="general-notes">Комментарий</label>
-        <textarea id="general-notes" data-field="generalNotes" placeholder="Например: вел сложный редизайн, хорошо держит коммуникацию с PM, но пока неустойчив в problem framing без внешней рамки.">${escapeHtml(state.generalNotes)}</textarea>
+        <label for="general-notes">комментарий</label>
+        <textarea id="general-notes" data-field="generalNotes" placeholder="например: вел сложный редизайн, хорошо держит коммуникацию с pm, но пока неустойчив в problem framing без внешней рамки.">${escapeHtml(state.generalNotes)}</textarea>
       </div>
     </section>
 
@@ -399,10 +399,10 @@ function render() {
         <span class="mini-chip">${progress}% заполнено</span>
       </div>
       <div class="action-row">
-        <button class="button" id="export-markdown-button" type="button">Экспортировать</button>
+        <button class="button" id="export-markdown-button" type="button">экспортировать</button>
       </div>
       <p class="footer-note">
-        В файл попадут контекст оценки, вопросы, выбранные ответы, оценки по навыкам и все комментарии.
+        в файл попадут контекст оценки, вопросы, выбранные ответы, оценки по навыкам и все комментарии.
       </p>
     </section>
 
@@ -428,7 +428,7 @@ function renderSelect(fieldId, label, value, options) {
     <div class="field">
       <label for="${fieldId}">${label}</label>
       <select id="${fieldId}" data-field="profile.${fieldId}">
-        <option value="">Не выбран</option>
+        <option value="">не выбран</option>
         ${options
           .map(
             (option) =>
@@ -480,7 +480,7 @@ function renderAxisCard(axis, index) {
                 />
                 <span class="grade-badge">${optionLabel}</span>
                 <span class="grade-copy">
-                  <strong>Вариант ${optionLabel}</strong>
+                  <strong>вариант ${optionLabel}</strong>
                   <span>${escapeHtml(statement)}</span>
                 </span>
               </label>
@@ -490,11 +490,11 @@ function renderAxisCard(axis, index) {
       </div>
 
       <div class="textarea-field">
-        <label for="evidence-${axis.id}">Комментарий</label>
+        <label for="evidence-${axis.id}">комментарий</label>
         <textarea
           id="evidence-${axis.id}"
           data-evidence-axis="${axis.id}"
-          placeholder="Опиши наблюдения, примеры и сигналы по этой оси."
+          placeholder="опиши наблюдения, примеры и сигналы по этой оси."
         >${escapeHtml(axisState.evidence)}</textarea>
       </div>
     </section>
@@ -516,9 +516,9 @@ function renderIdealDesignerSections() {
         <section class="profile-card">
           ${index === 0
             ? `
-              <h2>Дополнительная оценка по навыкам</h2>
+              <h2>дополнительная оценка по навыкам</h2>
               <p class="field-help">
-                Ниже добавлены блоки по ключевым навыкам. Для каждого навыка поставь оценку
+                ниже добавлены блоки по ключевым навыкам. Для каждого навыка поставь оценку
                 от 1 до 5 и оставь свободный комментарий.
               </p>
             `
@@ -544,7 +544,7 @@ function renderIdealDesignerCard(section) {
       <ul class="axis-prompts">
         ${section.bullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join("")}
       </ul>
-      <div class="axis-label">Оценка от 1 до 5</div>
+      <div class="axis-label">оценка от 1 до 5</div>
       <div class="score-row">
         ${[1, 2, 3, 4, 5]
           .map((score) => {
@@ -565,11 +565,11 @@ function renderIdealDesignerCard(section) {
           .join("")}
       </div>
       <div class="textarea-field">
-        <label for="rating-comment-${section.id}">Комментарий</label>
+        <label for="rating-comment-${section.id}">комментарий</label>
         <textarea
           id="rating-comment-${section.id}"
           data-rating-comment="${section.id}"
-          placeholder="Опиши, почему поставлена такая оценка по этому навыку."
+          placeholder="опиши, почему поставлена такая оценка по этому навыку."
         >${escapeHtml(ratingState.comment)}</textarea>
       </div>
     </section>
@@ -682,7 +682,7 @@ function exportMarkdown() {
     downloadTextFile(fileName, markdown, "text/markdown;charset=utf-8");
     state.error = "";
   } catch (error) {
-    state.error = error.message || "Не удалось собрать markdown-файл.";
+    state.error = error.message || "не удалось собрать markdown-файл.";
   }
 
   persistState();
@@ -690,7 +690,7 @@ function exportMarkdown() {
 }
 
 function resetForm() {
-  const shouldReset = window.confirm("Сбросить все поля формы и удалить сохраненные ответы?");
+  const shouldReset = window.confirm("сбросить все поля формы и удалить сохраненные ответы?");
   if (!shouldReset) {
     return;
   }
@@ -702,19 +702,19 @@ function resetForm() {
 
 function buildMarkdownExport() {
   const lines = [
-    "# Оценка дизайнера",
+    "# оценка дизайнера",
     "",
-    `- Сгенерировано: ${formatTimestamp(new Date())}`,
-    `- Дизайнер: ${formatField(state.profile.designerName)}`,
-    `- Роль дизайнера: ${formatField(state.profile.designerRole)}`,
-    `- Текущий формальный грейд: ${formatField(state.profile.currentGrade)}`,
-    `- Целевой грейд: ${formatField(state.profile.targetGrade)}`,
+    `- сгенерировано: ${formatTimestamp(new Date())}`,
+    `- дизайнер: ${formatField(state.profile.designerName)}`,
+    `- роль дизайнера: ${formatField(state.profile.designerRole)}`,
+    `- текущий формальный грейд: ${formatField(state.profile.currentGrade)}`,
+    `- целевой грейд: ${formatField(state.profile.targetGrade)}`,
     "",
-    "## Контекст команды и зоны ответственности",
+    "## контекст команды и зоны ответственности",
     "",
     formatParagraph(state.profile.context),
     "",
-    "## Основные вопросы",
+    "## основные вопросы",
     ""
   ];
 
@@ -729,26 +729,26 @@ function buildMarkdownExport() {
     lines.push(axis.description);
     lines.push("");
     if (hasPrompts) {
-      lines.push("Вопросы:");
+      lines.push("вопросы:");
       lines.push(...toMarkdownBullets(axis.prompts));
       lines.push("");
     }
-    lines.push("Варианты и ответы:");
+    lines.push("варианты и ответы:");
     lines.push(
       ...displayOptions.map(({ level, statement }, displayIndex) => {
         const optionLabel = OPTION_LABELS[displayIndex] || String(displayIndex + 1);
         const marker = selectedLevels.includes(Number(level)) ? "x" : " ";
-        return `- [${marker}] Вариант ${optionLabel}: ${statement}`;
+        return `- [${marker}] вариант ${optionLabel}: ${statement}`;
       })
     );
     lines.push("");
-    lines.push("Комментарий:");
+    lines.push("комментарий:");
     lines.push("");
     lines.push(formatParagraph(axisState.evidence));
     lines.push("");
   });
 
-  lines.push("## Дополнительная оценка по навыкам");
+  lines.push("## дополнительная оценка по навыкам");
   lines.push("");
 
   let currentStage = "";
@@ -762,18 +762,18 @@ function buildMarkdownExport() {
 
     lines.push(`#### ${section.title}`);
     lines.push("");
-    lines.push("Критерии:");
+    lines.push("критерии:");
     lines.push(...toMarkdownBullets(section.bullets));
     lines.push("");
-    lines.push(`- Оценка: ${rating.score ? `${rating.score} / 5` : "Не заполнено"}`);
+    lines.push(`- оценка: ${rating.score ? `${rating.score} / 5` : "не заполнено"}`);
     lines.push("");
-    lines.push("Комментарий:");
+    lines.push("комментарий:");
     lines.push("");
     lines.push(formatParagraph(rating.comment));
     lines.push("");
   });
 
-  lines.push("## Дополнительные заметки");
+  lines.push("## дополнительные заметки");
   lines.push("");
   lines.push(formatParagraph(state.generalNotes));
   lines.push("");
@@ -805,17 +805,17 @@ function formatTimestamp(date) {
 
 function formatField(value) {
   const trimmed = String(value || "").trim();
-  return trimmed || "Не заполнено";
+  return trimmed || "не заполнено";
 }
 
 function formatParagraph(value) {
   const trimmed = String(value || "").trim();
-  return trimmed || "Не заполнено";
+  return trimmed || "не заполнено";
 }
 
 function toMarkdownBullets(items) {
   if (!Array.isArray(items) || !items.length) {
-    return ["- Не заполнено"];
+    return ["- не заполнено"];
   }
 
   return items.map((item) => `- ${item}`);
