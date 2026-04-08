@@ -1,6 +1,6 @@
 const STORAGE_KEY = "designer-competency-app-v5";
 const ACCESS_KEY = "designer-competency-access-v1";
-const ACCESS_PASSWORD_HASH = "86de771b3bc9b99e47eff4e3dfa414a0d33b630c0299740465b5e018e3bc96af";
+const ACCESS_PASSWORD_HASH = "e72bc88336d5cb6acdc88691b23b853b95ba4475b4a73be0b3f29d915d7d2102";
 const OPTION_LABELS = ["a", "b", "c", "d", "e"];
 const GRADE_OPTIONS = ["14", "15", "16", "17", "18"];
 const TEXT_DOCUMENT_PATTERN = /\.(txt|md|markdown|csv|json|log|rtf|yaml|yml|xml|html?|css|js|ts|tsx|jsx)$/i;
@@ -1136,7 +1136,7 @@ async function resetForm() {
 
 async function hashPassword(value) {
   if (!window.crypto?.subtle) {
-    return value === "MPD-26" ? ACCESS_PASSWORD_HASH : "";
+    return value === "md-26" ? ACCESS_PASSWORD_HASH : "";
   }
 
   const data = new TextEncoder().encode(value);
