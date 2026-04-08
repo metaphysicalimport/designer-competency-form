@@ -7,6 +7,7 @@ const TEXT_DOCUMENT_PATTERN = /\.(txt|md|markdown|csv|json|log|rtf|yaml|yml|xml|
 const BUNDLED_ATTACHMENT_ID = "builtin-product-designer-competencies";
 const BUNDLED_ATTACHMENT_NAME = "компетенции продуктового дизайнера.md";
 const BUNDLED_ATTACHMENT_URL = new URL("./product-designer-competencies.md", window.location.href).toString();
+const SERVER_EVALUATION_URL = "/api/evaluate";
 const OPENAI_API_URL = "https://api.openai.com/v1/responses";
 const OPENAI_MODEL = "gpt-4.1";
 const OPENAI_KEY_STORAGE = "designer-competency-openai-key-v1";
@@ -1008,35 +1009,11 @@ async function requestEvaluation() {
   render();
 
   try {
-    const apiKey = await getOpenAIApiKey();
-    const response = await fetch(OPENAI_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        instructions: EVALUATION_INSTRUCTIONS,
-        input: cardMarkdown
-      })
-    });
+    const evaluation = shouldUseServerEvaluation()
+      ? await requestServerEvaluation(cardMarkdown)
+      : await requestClientEvaluation(cardMarkdown);
 
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(extractOpenAIErrorMessage(payload, response.status));
-    }
-
-    state.evaluation = {
-      status: "done",
-      fileName: "designer-assessment-result.md",
-      content: extractEvaluationText(payload)
-    };
-
-    if (!state.evaluation.content) {
-      throw new Error("OpenAI не вернул текст результата.");
-    }
-
+    state.evaluation = evaluation;
     state.error = "";
   } catch (error) {
     const errorMessage =
@@ -1054,6 +1031,65 @@ async function requestEvaluation() {
 
   persistState();
   render();
+}
+
+function shouldUseServerEvaluation() {
+  return !window.location.hostname.endsWith("github.io");
+}
+
+async function requestServerEvaluation(cardMarkdown) {
+  const response = await fetch(SERVER_EVALUATION_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      card_markdown: cardMarkdown
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `не удалось получить оценку. статус ответа: ${response.status}`);
+  }
+
+  return {
+    status: "done",
+    fileName: payload.file_name || "designer-assessment-result.md",
+    content: String(payload.content || "")
+  };
+}
+
+async function requestClientEvaluation(cardMarkdown) {
+  const apiKey = await getOpenAIApiKey();
+  const response = await fetch(OPENAI_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      instructions: EVALUATION_INSTRUCTIONS,
+      input: cardMarkdown
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(extractOpenAIErrorMessage(payload, response.status));
+  }
+
+  const content = extractEvaluationText(payload);
+  if (!content) {
+    throw new Error("OpenAI не вернул текст результата.");
+  }
+
+  return {
+    status: "done",
+    fileName: "designer-assessment-result.md",
+    content
+  };
 }
 
 function downloadEvaluationResult() {
