@@ -24,7 +24,9 @@
 html,
 body {
   margin: 0;
+  width: 100%;
   min-height: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -34,10 +36,10 @@ body {
 }
 
 .shell {
-  width: min(100%, 1280px);
+  width: min(100%, 712px);
   min-height: 100dvh;
   margin: 0 auto;
-  padding: 24px 24px 40px;
+  padding: 24px 16px 40px;
 }
 
 .hero {
@@ -118,6 +120,7 @@ h3 {
 .auth-gate,
 .error-box {
   min-width: 0;
+  max-width: 100%;
   border: 1px solid var(--black);
   background: var(--white);
 }
@@ -531,6 +534,7 @@ textarea {
 }
 
 .attachment-card {
+  max-width: 100%;
   padding: var(--space-3);
   border: 1px solid var(--black);
   background: var(--white);
@@ -544,9 +548,14 @@ textarea {
   gap: var(--space-2);
 }
 
+.attachment-card-head > * {
+  min-width: 0;
+}
+
 .attachment-content {
   margin: 0;
   max-height: 240px;
+  max-width: 100%;
   overflow: auto;
   padding: 12px;
   border: 1px solid var(--black);
@@ -579,9 +588,9 @@ textarea {
 
 @media (max-width: 719px) {
   .shell {
-    width: 100%;
+    width: min(100%, 704px);
     padding-top: 16px;
-    padding-inline: 16px;
+    padding-inline: 12px;
   }
 
   #app {
