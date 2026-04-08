@@ -3,6 +3,7 @@ const ACCESS_KEY = "designer-competency-access-v1";
 const ACCESS_PASSWORD_HASH = "86de771b3bc9b99e47eff4e3dfa414a0d33b630c0299740465b5e018e3bc96af";
 const OPTION_LABELS = ["a", "b", "c", "d", "e"];
 const GRADE_OPTIONS = ["14", "15", "16", "17", "18"];
+const TEXT_DOCUMENT_PATTERN = /\.(txt|md|markdown|csv|json|log|rtf|yaml|yml|xml|html?|css|js|ts|tsx|jsx)$/i;
 
 const AXES = [
   {
@@ -250,6 +251,7 @@ const DEFAULT_STATE = {
   ),
   optionOrder: buildOptionOrderMap(),
   generalNotes: "",
+  attachments: [],
   error: ""
 };
 
@@ -307,6 +309,9 @@ function loadState() {
         ...cloneDefaultState().idealRatings,
         ...(parsed.idealRatings || {})
       },
+      attachments: Array.isArray(parsed.attachments)
+        ? parsed.attachments.map(sanitizeAttachment).filter(Boolean)
+        : [],
       optionOrder: parsed.optionOrder || buildOptionOrderMap()
     };
 
@@ -364,10 +369,18 @@ function persistState() {
     profile: { ...state.profile },
     axes: JSON.parse(JSON.stringify(state.axes)),
     idealRatings: JSON.parse(JSON.stringify(state.idealRatings)),
+    attachments: JSON.parse(JSON.stringify(state.attachments || [])),
     optionOrder: JSON.parse(JSON.stringify(state.optionOrder))
   };
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+    return true;
+  } catch (error) {
+    state.error =
+      "не удалось сохранить форму в браузере. возможно, загруженные приложения слишком большие для локального хранения.";
+    return false;
+  }
 }
 
 function getAnsweredCount() {
@@ -449,6 +462,22 @@ function render() {
         <label for="general-notes">комментарий</label>
         <textarea id="general-notes" data-field="generalNotes" placeholder="например: сильные стороны, зоны роста, важные наблюдения, сомнения по калибровке или дополнительные сигналы, которые стоит учесть в оценке.">${escapeHtml(state.generalNotes)}</textarea>
       </div>
+      <div class="file-upload-stack">
+        <label for="notes-attachments">текстовые приложения</label>
+        <p class="field-help">
+          можно загрузить несколько текстовых документов. их содержимое автоматически
+          попадет в анкету и экспорт как отдельные приложения.
+        </p>
+        <input
+          id="notes-attachments"
+          class="file-input"
+          type="file"
+          data-attachments-input
+          accept=".txt,.md,.markdown,.csv,.json,.log,.rtf,.yaml,.yml,.xml,.html,.htm,.css,.js,.ts,.tsx,.jsx,text/*"
+          multiple
+        />
+      </div>
+      ${renderAttachmentList()}
     </section>
 
     <section class="submit-bar">
@@ -459,7 +488,8 @@ function render() {
         <button class="button" id="export-markdown-button" type="button">экспортировать</button>
       </div>
       <p class="footer-note">
-        в файл попадут контекст оценки, вопросы, выбранные ответы, оценки по навыкам и все комментарии.
+        в файл попадут контекст оценки, вопросы, выбранные ответы, оценки по навыкам,
+        комментарии и загруженные приложения.
       </p>
     </section>
 
@@ -643,6 +673,40 @@ function renderIdealDesignerCard(section) {
   `;
 }
 
+function renderAttachmentList() {
+  const attachments = Array.isArray(state.attachments) ? state.attachments : [];
+  if (!attachments.length) {
+    return "";
+  }
+
+  return `
+    <div class="attachment-list">
+      ${attachments.map((attachment, index) => renderAttachmentCard(attachment, index)).join("")}
+    </div>
+  `;
+}
+
+function renderAttachmentCard(attachment, index) {
+  return `
+    <section class="attachment-card">
+      <div class="attachment-card-head">
+        <div class="attachment-card-copy">
+          <span class="eyebrow-soft">приложение ${index + 1}</span>
+          <h3>${escapeHtml(attachment.name)}</h3>
+        </div>
+        <button
+          class="button-secondary"
+          type="button"
+          data-remove-attachment="${escapeHtml(attachment.id)}"
+        >
+          удалить
+        </button>
+      </div>
+      <pre class="attachment-content">${escapeHtml(attachment.content)}</pre>
+    </section>
+  `;
+}
+
 function getDisplayOptions(axis) {
   const order = state.optionOrder?.[axis.id] || Object.keys(axis.options).map(Number);
   return order.map((level) => ({
@@ -671,6 +735,15 @@ function attachEvents() {
 
   document.querySelectorAll('input[type="checkbox"][data-axis]').forEach((node) => {
     node.addEventListener("change", handleAxisSelectionToggle);
+  });
+
+  const attachmentsInput = document.querySelector("[data-attachments-input]");
+  if (attachmentsInput) {
+    attachmentsInput.addEventListener("change", handleAttachmentUpload);
+  }
+
+  document.querySelectorAll("[data-remove-attachment]").forEach((node) => {
+    node.addEventListener("click", handleAttachmentRemove);
   });
 
   const exportMarkdownButton = document.getElementById("export-markdown-button");
@@ -728,14 +801,18 @@ function handleFieldInput(event) {
   }
 
   state.error = "";
-  persistState();
+  if (!persistState()) {
+    render();
+  }
 }
 
 function handleEvidenceInput(event) {
   const axisId = event.target.dataset.evidenceAxis;
   state.axes[axisId].evidence = event.target.value;
   state.error = "";
-  persistState();
+  if (!persistState()) {
+    render();
+  }
 }
 
 function handleRatingScoreChange(event) {
@@ -750,7 +827,9 @@ function handleRatingCommentInput(event) {
   const sectionId = event.target.dataset.ratingComment;
   state.idealRatings[sectionId].comment = event.target.value;
   state.error = "";
-  persistState();
+  if (!persistState()) {
+    render();
+  }
 }
 
 function handleAxisSelectionToggle(event) {
@@ -769,6 +848,49 @@ function handleAxisSelectionToggle(event) {
   state.axes[axisId].selectedStatements = nextLevels
     .map((level) => axisConfig?.options?.[level] || "")
     .filter(Boolean);
+  state.error = "";
+  persistState();
+  render();
+}
+
+async function handleAttachmentUpload(event) {
+  const input = event.target;
+  const files = Array.from(input.files || []);
+  if (!files.length) {
+    return;
+  }
+
+  const previousAttachments = Array.isArray(state.attachments) ? [...state.attachments] : [];
+  state.error = "";
+
+  try {
+    const invalidFile = files.find((file) => !isTextDocument(file));
+    if (invalidFile) {
+      throw new Error(
+        `файл "${invalidFile.name}" не похож на текстовый документ. загрузи txt, md, csv, json или другой text-файл.`
+      );
+    }
+
+    const nextAttachments = await Promise.all(files.map(readTextAttachment));
+    state.attachments = [...previousAttachments, ...nextAttachments];
+
+    if (!persistState()) {
+      state.attachments = previousAttachments;
+      persistState();
+    }
+  } catch (error) {
+    state.attachments = previousAttachments;
+    state.error = error.message || "не удалось прочитать загруженные документы.";
+    persistState();
+  }
+
+  input.value = "";
+  render();
+}
+
+function handleAttachmentRemove(event) {
+  const attachmentId = event.currentTarget.dataset.removeAttachment;
+  state.attachments = (state.attachments || []).filter((attachment) => attachment.id !== attachmentId);
   state.error = "";
   persistState();
   render();
@@ -889,6 +1011,13 @@ function buildMarkdownExport() {
   lines.push(formatParagraph(state.generalNotes));
   lines.push("");
 
+  (state.attachments || []).forEach((attachment, index) => {
+    lines.push(`### приложение ${index + 1} - ${attachment.name}`);
+    lines.push("");
+    lines.push(formatAttachmentContent(attachment.content));
+    lines.push("");
+  });
+
   return lines.join("\n");
 }
 
@@ -924,12 +1053,50 @@ function formatParagraph(value) {
   return trimmed || "не заполнено";
 }
 
+function formatAttachmentContent(value) {
+  const normalized = normalizeTextContent(value).trim();
+  return normalized || "не заполнено";
+}
+
 function toMarkdownBullets(items) {
   if (!Array.isArray(items) || !items.length) {
     return ["- не заполнено"];
   }
 
   return items.map((item) => `- ${item}`);
+}
+
+function sanitizeAttachment(attachment, index = 0) {
+  if (!attachment || typeof attachment !== "object") {
+    return null;
+  }
+
+  return {
+    id: String(attachment.id || buildAttachmentId()),
+    name: String(attachment.name || `документ-${index + 1}.txt`).trim() || `документ-${index + 1}.txt`,
+    content: normalizeTextContent(attachment.content)
+  };
+}
+
+function isTextDocument(file) {
+  return file.type.startsWith("text/") || TEXT_DOCUMENT_PATTERN.test(file.name);
+}
+
+async function readTextAttachment(file) {
+  const content = await file.text();
+  return {
+    id: buildAttachmentId(),
+    name: file.name || "документ.txt",
+    content: normalizeTextContent(content)
+  };
+}
+
+function buildAttachmentId() {
+  return `attachment-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function normalizeTextContent(value) {
+  return String(value || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 }
 
 function downloadTextFile(fileName, content, mimeType) {
