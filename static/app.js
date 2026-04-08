@@ -7,7 +7,32 @@ const TEXT_DOCUMENT_PATTERN = /\.(txt|md|markdown|csv|json|log|rtf|yaml|yml|xml|
 const BUNDLED_ATTACHMENT_ID = "builtin-product-designer-competencies";
 const BUNDLED_ATTACHMENT_NAME = "компетенции продуктового дизайнера.md";
 const BUNDLED_ATTACHMENT_URL = new URL("./product-designer-competencies.md", window.location.href).toString();
-const EVALUATION_API_URL = "/api/evaluate";
+const OPENAI_API_URL = "https://api.openai.com/v1/responses";
+const OPENAI_MODEL = "gpt-4.1";
+const OPENAI_KEY_STORAGE = "designer-competency-openai-key-v1";
+const EVALUATION_INSTRUCTIONS = `
+проанализируй содержимое анкеты, критерии карты компетенции, и подготовь оценку дизайнера, его грейд и точки роста.
+
+верни результат в markdown на русском языке.
+
+структура ответа:
+# оценка дизайнера
+
+## итог
+- рекомендуемый грейд
+- уверенность в оценке
+- краткий вывод
+
+## обоснование грейда
+
+## сильные стороны
+
+## точки роста
+
+## риски и пробелы в данных
+
+## рекомендации для следующего шага
+`.trim();
 
 const AXES = [
   {
@@ -983,13 +1008,17 @@ async function requestEvaluation() {
   render();
 
   try {
-    const response = await fetch(EVALUATION_API_URL, {
+    const apiKey = await getOpenAIApiKey();
+    const response = await fetch(OPENAI_API_URL, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        card_markdown: cardMarkdown
+        model: OPENAI_MODEL,
+        instructions: EVALUATION_INSTRUCTIONS,
+        input: cardMarkdown
       })
     });
 
@@ -1000,9 +1029,14 @@ async function requestEvaluation() {
 
     state.evaluation = {
       status: "done",
-      fileName: payload.file_name || "designer-assessment-result.md",
-      content: String(payload.content || "")
+      fileName: "designer-assessment-result.md",
+      content: extractEvaluationText(payload)
     };
+
+    if (!state.evaluation.content) {
+      throw new Error("OpenAI не вернул текст результата.");
+    }
+
     state.error = "";
   } catch (error) {
     state.evaluation = {
@@ -1170,6 +1204,57 @@ function clearEvaluationResult() {
     fileName: "",
     content: ""
   };
+}
+
+async function getOpenAIApiKey() {
+  const storedKey = getStoredOpenAIApiKey();
+  if (storedKey) {
+    return storedKey;
+  }
+
+  const promptedKey = window.prompt("вставь OpenAI API key для получения оценки");
+  const normalizedKey = String(promptedKey || "").trim();
+  if (!normalizedKey) {
+    throw new Error("OpenAI API key не указан.");
+  }
+
+  setStoredOpenAIApiKey(normalizedKey);
+  return normalizedKey;
+}
+
+function getStoredOpenAIApiKey() {
+  try {
+    return localStorage.getItem(OPENAI_KEY_STORAGE) || "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function setStoredOpenAIApiKey(value) {
+  try {
+    localStorage.setItem(OPENAI_KEY_STORAGE, value);
+  } catch (error) {
+    return;
+  }
+}
+
+function extractEvaluationText(payload) {
+  if (typeof payload.output_text === "string" && payload.output_text.trim()) {
+    return payload.output_text.trim();
+  }
+
+  const output = Array.isArray(payload.output) ? payload.output : [];
+  const parts = [];
+  output.forEach((item) => {
+    const content = Array.isArray(item.content) ? item.content : [];
+    content.forEach((entry) => {
+      if (entry?.type === "output_text" && typeof entry.text === "string") {
+        parts.push(entry.text);
+      }
+    });
+  });
+
+  return parts.join("\n").trim();
 }
 
 function slugifyFileName(value) {
