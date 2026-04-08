@@ -389,7 +389,7 @@ function render() {
         обратную связь от PM или разработки и любые наблюдения, которые важно не потерять.
       </p>
       <div class="textarea-field">
-        <label for="general-notes">Комментарий арт-директора</label>
+        <label for="general-notes">Комментарий</label>
         <textarea id="general-notes" data-field="generalNotes" placeholder="Например: вел сложный редизайн, хорошо держит коммуникацию с PM, но пока неустойчив в problem framing без внешней рамки.">${escapeHtml(state.generalNotes)}</textarea>
       </div>
     </section>
@@ -402,7 +402,7 @@ function render() {
         <button class="button" id="export-markdown-button" type="button">Экспортировать</button>
       </div>
       <p class="footer-note">
-        В файл попадут контекст оценки, вопросы, выбранные ответы, оценки по навыкам и все комментарии арт-директора.
+        В файл попадут контекст оценки, вопросы, выбранные ответы, оценки по навыкам и все комментарии.
       </p>
     </section>
 
@@ -490,7 +490,7 @@ function renderAxisCard(axis, index) {
       </div>
 
       <div class="textarea-field">
-        <label for="evidence-${axis.id}">Комментарий арт-директора</label>
+        <label for="evidence-${axis.id}">Комментарий</label>
         <textarea
           id="evidence-${axis.id}"
           data-evidence-axis="${axis.id}"
@@ -519,7 +519,7 @@ function renderIdealDesignerSections() {
               <h2>Дополнительная оценка по навыкам</h2>
               <p class="field-help">
                 Ниже добавлены блоки по ключевым навыкам. Для каждого навыка поставь оценку
-                от 1 до 5 и оставь свободный комментарий арт-директора.
+                от 1 до 5 и оставь свободный комментарий.
               </p>
             `
             : ""}
@@ -565,7 +565,7 @@ function renderIdealDesignerCard(section) {
           .join("")}
       </div>
       <div class="textarea-field">
-        <label for="rating-comment-${section.id}">Комментарий арт-директора</label>
+        <label for="rating-comment-${section.id}">Комментарий</label>
         <textarea
           id="rating-comment-${section.id}"
           data-rating-comment="${section.id}"
@@ -742,7 +742,7 @@ function buildMarkdownExport() {
       })
     );
     lines.push("");
-    lines.push("Комментарий арт-директора:");
+    lines.push("Комментарий:");
     lines.push("");
     lines.push(formatParagraph(axisState.evidence));
     lines.push("");
@@ -767,7 +767,7 @@ function buildMarkdownExport() {
     lines.push("");
     lines.push(`- Оценка: ${rating.score ? `${rating.score} / 5` : "Не заполнено"}`);
     lines.push("");
-    lines.push("Комментарий арт-директора:");
+    lines.push("Комментарий:");
     lines.push("");
     lines.push(formatParagraph(rating.comment));
     lines.push("");
