@@ -429,6 +429,14 @@ function render() {
 
     ${AXES.map(renderAxisCard).join("")}
 
+    <section class="profile-card">
+      <h2>дополнительная оценка по навыкам</h2>
+      <p class="field-help">
+        ниже добавлены блоки по ключевым навыкам. Для каждого навыка поставь оценку
+        от 1 до 5 и оставь свободный комментарий.
+      </p>
+    </section>
+
     ${renderIdealDesignerSections()}
 
     <section class="profile-card">
@@ -581,17 +589,8 @@ function renderIdealDesignerSections() {
 
   return Object.entries(grouped)
     .map(
-      ([stage, sections], index) => `
+      ([stage, sections]) => `
         <section class="profile-card">
-          ${index === 0
-            ? `
-              <h2>дополнительная оценка по навыкам</h2>
-              <p class="field-help">
-                ниже добавлены блоки по ключевым навыкам. Для каждого навыка поставь оценку
-                от 1 до 5 и оставь свободный комментарий.
-              </p>
-            `
-            : ""}
           <h2 class="subsection-title">${escapeHtml(stage)}</h2>
           <div class="ideal-stack">
             ${sections.map(renderIdealDesignerCard).join("")}
