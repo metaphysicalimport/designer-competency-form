@@ -6,7 +6,7 @@ const GRADE_OPTIONS = ["14", "15", "16", "17", "18"];
 const TEXT_DOCUMENT_PATTERN = /\.(txt|md|markdown|csv|json|log|rtf|yaml|yml|xml|html?|css|js|ts|tsx|jsx)$/i;
 const BUNDLED_ATTACHMENT_ID = "builtin-product-designer-competencies";
 const BUNDLED_ATTACHMENT_NAME = "компетенции продуктового дизайнера.md";
-const BUNDLED_ATTACHMENT_URL = new URL("./компетенции продуктового дизайнера.md", window.location.href).toString();
+const BUNDLED_ATTACHMENT_URL = new URL("./product-designer-competencies.md", window.location.href).toString();
 
 const AXES = [
   {
