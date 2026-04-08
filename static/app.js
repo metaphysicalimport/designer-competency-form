@@ -543,7 +543,6 @@ function renderIdealDesignerCard(section) {
       <ul class="axis-prompts">
         ${section.bullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join("")}
       </ul>
-      <div class="axis-label">оценка от 1 до 5</div>
       <div class="score-row">
         ${[1, 2, 3, 4, 5]
           .map((score) => {
