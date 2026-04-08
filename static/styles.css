@@ -386,6 +386,11 @@ textarea {
 .button-secondary {
   background: var(--white);
   color: var(--black);
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 400;
 }
 
 .button:disabled {
