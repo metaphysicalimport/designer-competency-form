@@ -34,10 +34,10 @@ body {
 }
 
 .shell {
-  width: clamp(320px, calc(100vw - 32px), 680px);
+  width: min(100%, 712px);
   min-height: 100dvh;
   margin: 0 auto;
-  padding: 24px 0 40px;
+  padding: 24px 16px 40px;
 }
 
 .hero {
@@ -117,6 +117,7 @@ h3 {
 .rating-card,
 .auth-gate,
 .error-box {
+  min-width: 0;
   border: 1px solid var(--black);
   background: var(--white);
 }
@@ -137,6 +138,11 @@ h3 {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+}
+
+.progress-dock-head > *,
+.meta-row > * {
+  min-width: 0;
 }
 
 .progress-dock-actions {
@@ -368,7 +374,7 @@ textarea {
 
 .axis-head {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: var(--space-3);
   align-items: start;
 }
@@ -401,7 +407,7 @@ textarea {
 .grade-option {
   position: relative;
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: var(--space-3);
   padding: 12px;
   border: 1px solid var(--black);
@@ -573,8 +579,9 @@ textarea {
 
 @media (max-width: 719px) {
   .shell {
-    width: clamp(320px, calc(100vw - 24px), 680px);
+    width: min(100%, 704px);
     padding-top: 16px;
+    padding-inline: 12px;
   }
 
   #app {
