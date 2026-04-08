@@ -85,7 +85,7 @@ h3 {
 .footer-note,
 .progress-copy {
   color: var(--black-72);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.6;
 }
 
@@ -292,7 +292,7 @@ textarea {
 }
 
 .axis-prompts {
-  margin: 0;
+  margin: -8px 0 0;
   padding-left: 18px;
   display: grid;
   gap: 4px;
