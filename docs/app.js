@@ -372,7 +372,10 @@ function render() {
   app.innerHTML = `
     <section class="progress-dock">
       <div class="progress-dock-head">
-        <span class="mini-chip">${progress}% заполнено</span>
+        <div class="progress-dock-actions">
+          <span class="mini-chip">${progress}% заполнено</span>
+          <button class="button button-secondary" id="reset-form-button" type="button">Сбросить форму</button>
+        </div>
         <span class="progress-copy">заполнено ${answeredCount} из ${totalCount} блоков</span>
       </div>
       <div class="progress-line">
@@ -628,6 +631,11 @@ function attachEvents() {
   if (exportMarkdownButton) {
     exportMarkdownButton.addEventListener("click", exportMarkdown);
   }
+
+  const resetFormButton = document.getElementById("reset-form-button");
+  if (resetFormButton) {
+    resetFormButton.addEventListener("click", resetForm);
+  }
 }
 
 function handleFieldInput(event) {
@@ -698,6 +706,17 @@ function exportMarkdown() {
     state.error = error.message || "Не удалось собрать markdown-файл.";
   }
 
+  persistState();
+  render();
+}
+
+function resetForm() {
+  const shouldReset = window.confirm("Сбросить все поля формы и удалить сохраненные ответы?");
+  if (!shouldReset) {
+    return;
+  }
+
+  state = cloneDefaultState();
   persistState();
   render();
 }

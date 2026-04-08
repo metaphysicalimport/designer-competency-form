@@ -123,6 +123,13 @@ h3 {
   gap: var(--space-2);
 }
 
+.progress-dock-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .mini-chip,
 .meta-chip,
 .eyebrow,
@@ -376,6 +383,11 @@ textarea {
   cursor: pointer;
 }
 
+.button-secondary {
+  background: var(--white);
+  color: var(--black);
+}
+
 .button:disabled {
   cursor: not-allowed;
   opacity: 0.4;
@@ -408,7 +420,8 @@ textarea {
 @media (max-width: 520px) {
   .field-grid--double,
   .progress-dock-head,
-  .meta-row {
+  .meta-row,
+  .progress-dock-actions {
     grid-template-columns: 1fr;
   }
 
@@ -417,7 +430,8 @@ textarea {
   }
 
   .progress-dock-head,
-  .meta-row {
+  .meta-row,
+  .progress-dock-actions {
     display: grid;
     justify-content: stretch;
   }
