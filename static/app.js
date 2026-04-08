@@ -468,9 +468,12 @@ function render() {
           можно загрузить несколько текстовых документов. их содержимое автоматически
           попадет в анкету и экспорт как отдельные приложения.
         </p>
+        <div class="file-upload-row">
+          <label class="button file-trigger" for="notes-attachments">выбрать файлы</label>
+        </div>
         <input
           id="notes-attachments"
-          class="file-input"
+          class="file-input file-input--hidden"
           type="file"
           data-attachments-input
           accept=".txt,.md,.markdown,.csv,.json,.log,.rtf,.yaml,.yml,.xml,.html,.htm,.css,.js,.ts,.tsx,.jsx,text/*"
@@ -935,7 +938,7 @@ async function hashPassword(value) {
 
 function buildMarkdownExport() {
   const lines = [
-    "# оценка дизайнера",
+    "# карточка",
     "",
     `- сгенерировано: ${formatTimestamp(new Date())}`,
     `- дизайнер: ${formatField(state.profile.designerName)}`,

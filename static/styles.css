@@ -270,6 +270,12 @@ h3 {
   gap: var(--space-2);
 }
 
+.file-upload-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .field label,
 .textarea-field label,
 .axis-label {
@@ -305,6 +311,18 @@ input[type="file"] {
   outline: none;
 }
 
+.file-input--hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 input[type="text"]::placeholder,
 input[type="password"]::placeholder,
 textarea::placeholder {
@@ -330,6 +348,10 @@ input[type="file"]::file-selector-button {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+}
+
+.file-trigger {
+  width: auto;
 }
 
 select {
