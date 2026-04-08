@@ -1,5 +1,6 @@
 const STORAGE_KEY = "designer-competency-app-v5";
 const OPTION_LABELS = ["A", "B", "C", "D", "E"];
+const GRADE_OPTIONS = ["14", "15", "16", "17", "18"];
 
 const AXES = [
   {
@@ -227,10 +228,8 @@ const IDEAL_DESIGNER_SECTIONS = [
 
 const DEFAULT_STATE = {
   profile: {
-    evaluatorName: "",
-    evaluatorRole: "арт-директор",
     designerName: "",
-    designerRole: "product designer",
+    designerRole: "старший дизайнер продукта",
     currentGrade: "",
     targetGrade: "",
     context: ""
@@ -276,7 +275,7 @@ function loadState() {
     }
 
     const parsed = JSON.parse(raw);
-    return {
+    const nextState = {
       ...cloneDefaultState(),
       ...parsed,
       profile: {
@@ -293,6 +292,12 @@ function loadState() {
       },
       optionOrder: parsed.optionOrder || buildOptionOrderMap()
     };
+
+    if (!nextState.profile.designerRole || nextState.profile.designerRole === "product designer") {
+      nextState.profile.designerRole = cloneDefaultState().profile.designerRole;
+    }
+
+    return nextState;
   } catch (error) {
     return cloneDefaultState();
   }
@@ -365,31 +370,30 @@ function render() {
   const progress = Math.round((answeredCount / totalCount) * 100);
 
   app.innerHTML = `
-    <section class="panel">
-      <div class="progress-wrap">
-        <div class="meta-row">
-          <span class="meta-chip">заполнено ${answeredCount} из ${totalCount} блоков</span>
-          <span class="meta-chip">экспорт в один .md файл</span>
-        </div>
-        <div class="progress-line">
-          <div class="progress-fill" style="width:${progress}%"></div>
-        </div>
+    <section class="progress-dock">
+      <div class="progress-dock-head">
+        <span class="mini-chip">${progress}% заполнено</span>
+        <span class="progress-copy">заполнено ${answeredCount} из ${totalCount} блоков</span>
       </div>
-      <p class="section-note">
-        Заполни контекст, отметь наблюдаемые паттерны, оцени навыки по шкале от 1 до 5
-        и выгрузи все ответы, комментарии и оценки в markdown.
-      </p>
+      <div class="progress-line">
+        <div class="progress-fill" style="width:${progress}%"></div>
+      </div>
     </section>
 
     <section class="profile-card">
       <h2>Контекст оценки</h2>
       <div class="field-grid">
-        ${renderInput("evaluatorName", "Кто оценивает", state.profile.evaluatorName, "Например, Дима")}
-        ${renderInput("evaluatorRole", "Твоя роль", state.profile.evaluatorRole, "Например, арт-директор")}
-        ${renderInput("designerName", "Имя дизайнера", state.profile.designerName, "Например, Алина")}
-        ${renderInput("designerRole", "Роль дизайнера", state.profile.designerRole, "Например, product designer")}
-        ${renderInput("currentGrade", "Текущий формальный грейд дизайнера", state.profile.currentGrade, "Например, 15")}
-        ${renderInput("targetGrade", "Целевой грейд дизайнера", state.profile.targetGrade, "Например, 16")}
+        ${renderInput("designerName", "Дизайнер", state.profile.designerName, "Например, Алина")}
+        ${renderInput(
+          "designerRole",
+          "Роль дизайнера",
+          state.profile.designerRole,
+          "Например, старший дизайнер продукта"
+        )}
+      </div>
+      <div class="field-grid field-grid--double">
+        ${renderSelect("currentGrade", "Текущий формальный грейд", state.profile.currentGrade, GRADE_OPTIONS)}
+        ${renderSelect("targetGrade", "Целевой грейд", state.profile.targetGrade, GRADE_OPTIONS)}
       </div>
       <div class="textarea-field">
         <label for="profile-context">Контекст команды и зоны ответственности дизайнера</label>
@@ -416,7 +420,6 @@ function render() {
     <section class="submit-bar">
       <div class="meta-row">
         <span class="mini-chip">${progress}% заполнено</span>
-        <span class="mini-chip">локальный экспорт без сервера</span>
       </div>
       <div class="action-row">
         <button class="button" id="export-markdown-button" type="button">Экспортировать</button>
@@ -437,6 +440,25 @@ function renderInput(fieldId, label, value, placeholder) {
     <div class="field">
       <label for="${fieldId}">${label}</label>
       <input id="${fieldId}" type="text" data-field="profile.${fieldId}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" />
+    </div>
+  `;
+}
+
+function renderSelect(fieldId, label, value, options) {
+  const normalizedValue = options.includes(String(value)) ? String(value) : "";
+
+  return `
+    <div class="field">
+      <label for="${fieldId}">${label}</label>
+      <select id="${fieldId}" data-field="profile.${fieldId}">
+        <option value="">Не выбран</option>
+        ${options
+          .map(
+            (option) =>
+              `<option value="${option}" ${normalizedValue === option ? "selected" : ""}>${option}</option>`
+          )
+          .join("")}
+      </select>
     </div>
   `;
 }
@@ -583,6 +605,7 @@ function getDisplayOptions(axis) {
 function attachEvents() {
   document.querySelectorAll("[data-field]").forEach((node) => {
     node.addEventListener("input", handleFieldInput);
+    node.addEventListener("change", handleFieldInput);
   });
 
   document.querySelectorAll("[data-evidence-axis]").forEach((node) => {
@@ -684,8 +707,6 @@ function buildMarkdownExport() {
     "# Оценка дизайнера",
     "",
     `- Сгенерировано: ${formatTimestamp(new Date())}`,
-    `- Кто оценивает: ${formatField(state.profile.evaluatorName)}`,
-    `- Роль оценивающего: ${formatField(state.profile.evaluatorRole)}`,
     `- Дизайнер: ${formatField(state.profile.designerName)}`,
     `- Роль дизайнера: ${formatField(state.profile.designerRole)}`,
     `- Текущий формальный грейд: ${formatField(state.profile.currentGrade)}`,

@@ -89,8 +89,8 @@ body::after {
 
 .hero {
   display: grid;
-  gap: var(--space-3);
-  padding-bottom: var(--space-5);
+  gap: var(--space-2);
+  padding-bottom: var(--space-3);
 }
 
 .eyebrow-row,
@@ -172,7 +172,33 @@ h3 {
   gap: var(--space-4);
 }
 
-.panel,
+.progress-dock {
+  position: sticky;
+  top: 10px;
+  z-index: 4;
+  display: grid;
+  gap: var(--space-2);
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(28, 36, 43, 0.08);
+  background: rgba(255, 250, 243, 0.88);
+  box-shadow: 0 14px 30px rgba(56, 39, 18, 0.1);
+  backdrop-filter: blur(18px);
+}
+
+.progress-dock-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.progress-copy {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+
 .profile-card,
 .axis-card,
 .submit-bar {
@@ -181,22 +207,8 @@ h3 {
   background: var(--surface);
 }
 
-.panel,
 .profile-card {
   padding: var(--space-4);
-}
-
-.panel {
-  display: grid;
-  gap: var(--space-3);
-  background:
-    linear-gradient(135deg, rgba(239, 108, 77, 0.08), transparent 40%),
-    linear-gradient(180deg, var(--surface-strong), rgba(255, 249, 241, 0.9));
-}
-
-.progress-wrap {
-  display: grid;
-  gap: var(--space-2);
 }
 
 .progress-line {
@@ -285,6 +297,10 @@ h3 {
   gap: var(--space-3);
 }
 
+.field-grid--double {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .field,
 .textarea-field {
   display: grid;
@@ -300,6 +316,7 @@ h3 {
 }
 
 input[type="text"],
+select,
 textarea {
   width: 100%;
   border: 1px solid rgba(28, 36, 43, 0.12);
@@ -313,9 +330,14 @@ textarea {
 }
 
 input[type="text"]:focus,
+select:focus,
 textarea:focus {
   border-color: rgba(239, 108, 77, 0.4);
   box-shadow: 0 0 0 4px rgba(239, 108, 77, 0.1);
+}
+
+select {
+  appearance: none;
 }
 
 textarea {
