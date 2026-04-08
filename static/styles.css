@@ -342,14 +342,7 @@ textarea {
 
 .grade-copy {
   display: grid;
-  gap: 4px;
-}
-
-.grade-copy strong {
-  color: var(--black-72);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.4;
+  gap: 0;
 }
 
 .grade-copy span {

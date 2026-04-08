@@ -480,7 +480,6 @@ function renderAxisCard(axis, index) {
                 />
                 <span class="grade-badge">${optionLabel}</span>
                 <span class="grade-copy">
-                  <strong>вариант ${optionLabel}</strong>
                   <span>${escapeHtml(statement)}</span>
                 </span>
               </label>
@@ -738,7 +737,7 @@ function buildMarkdownExport() {
       ...displayOptions.map(({ level, statement }, displayIndex) => {
         const optionLabel = OPTION_LABELS[displayIndex] || String(displayIndex + 1);
         const marker = selectedLevels.includes(Number(level)) ? "x" : " ";
-        return `- [${marker}] вариант ${optionLabel}: ${statement}`;
+        return `- [${marker}] ${optionLabel}: ${statement}`;
       })
     );
     lines.push("");
