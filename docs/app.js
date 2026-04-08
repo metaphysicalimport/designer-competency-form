@@ -4,6 +4,9 @@ const ACCESS_PASSWORD_HASH = "86de771b3bc9b99e47eff4e3dfa414a0d33b630c0299740465
 const OPTION_LABELS = ["a", "b", "c", "d", "e"];
 const GRADE_OPTIONS = ["14", "15", "16", "17", "18"];
 const TEXT_DOCUMENT_PATTERN = /\.(txt|md|markdown|csv|json|log|rtf|yaml|yml|xml|html?|css|js|ts|tsx|jsx)$/i;
+const BUNDLED_ATTACHMENT_ID = "builtin-product-designer-competencies";
+const BUNDLED_ATTACHMENT_NAME = "компетенции продуктового дизайнера.md";
+const BUNDLED_ATTACHMENT_URL = new URL("./компетенции продуктового дизайнера.md", window.location.href).toString();
 
 const AXES = [
   {
@@ -259,10 +262,13 @@ let state = loadState();
 const app = document.getElementById("app");
 let hasAccess = getStoredAccess();
 let authError = "";
+let bundledDefaultAttachment = null;
 
 init();
 
-function init() {
+async function init() {
+  await ensureBundledDefaultAttachment();
+  persistState();
   render();
 }
 
@@ -318,6 +324,8 @@ function loadState() {
     if (!nextState.profile.designerRole || nextState.profile.designerRole === "product designer") {
       nextState.profile.designerRole = cloneDefaultState().profile.designerRole;
     }
+
+    nextState.attachments = mergeDefaultAttachments(nextState.attachments);
 
     return nextState;
   } catch (error) {
@@ -697,13 +705,17 @@ function renderAttachmentCard(attachment, index) {
           <span class="eyebrow-soft">приложение ${index + 1}</span>
           <h3>${escapeHtml(attachment.name)}</h3>
         </div>
-        <button
-          class="button-secondary"
-          type="button"
-          data-remove-attachment="${escapeHtml(attachment.id)}"
-        >
-          удалить
-        </button>
+        ${attachment.locked
+          ? ""
+          : `
+            <button
+              class="button-secondary"
+              type="button"
+              data-remove-attachment="${escapeHtml(attachment.id)}"
+            >
+              удалить
+            </button>
+          `}
       </div>
       <pre class="attachment-content">${escapeHtml(attachment.content)}</pre>
     </section>
@@ -875,7 +887,7 @@ async function handleAttachmentUpload(event) {
     }
 
     const nextAttachments = await Promise.all(files.map(readTextAttachment));
-    state.attachments = [...previousAttachments, ...nextAttachments];
+    state.attachments = mergeDefaultAttachments([...previousAttachments, ...nextAttachments]);
 
     if (!persistState()) {
       state.attachments = previousAttachments;
@@ -893,7 +905,13 @@ async function handleAttachmentUpload(event) {
 
 function handleAttachmentRemove(event) {
   const attachmentId = event.currentTarget.dataset.removeAttachment;
-  state.attachments = (state.attachments || []).filter((attachment) => attachment.id !== attachmentId);
+  if (attachmentId === BUNDLED_ATTACHMENT_ID) {
+    return;
+  }
+
+  state.attachments = mergeDefaultAttachments(
+    (state.attachments || []).filter((attachment) => attachment.id !== attachmentId)
+  );
   state.error = "";
   persistState();
   render();
@@ -913,13 +931,14 @@ function exportMarkdown() {
   render();
 }
 
-function resetForm() {
+async function resetForm() {
   const shouldReset = window.confirm("сбросить все поля формы и удалить сохраненные ответы?");
   if (!shouldReset) {
     return;
   }
 
   state = cloneDefaultState();
+  await ensureBundledDefaultAttachment();
   persistState();
   render();
 }
@@ -1077,8 +1096,43 @@ function sanitizeAttachment(attachment, index = 0) {
   return {
     id: String(attachment.id || buildAttachmentId()),
     name: String(attachment.name || `документ-${index + 1}.txt`).trim() || `документ-${index + 1}.txt`,
-    content: normalizeTextContent(attachment.content)
+    content: normalizeTextContent(attachment.content),
+    locked: Boolean(attachment.locked)
   };
+}
+
+async function ensureBundledDefaultAttachment() {
+  try {
+    if (!bundledDefaultAttachment) {
+      const response = await fetch(BUNDLED_ATTACHMENT_URL, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(`не удалось загрузить встроенное приложение: ${response.status}`);
+      }
+
+      bundledDefaultAttachment = sanitizeAttachment({
+        id: BUNDLED_ATTACHMENT_ID,
+        name: BUNDLED_ATTACHMENT_NAME,
+        content: await response.text(),
+        locked: true
+      });
+    }
+
+    state.attachments = mergeDefaultAttachments(state.attachments);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+function mergeDefaultAttachments(attachments) {
+  const normalized = Array.isArray(attachments) ? attachments.map(sanitizeAttachment).filter(Boolean) : [];
+  if (!bundledDefaultAttachment) {
+    return normalized;
+  }
+
+  return [
+    bundledDefaultAttachment,
+    ...normalized.filter((attachment) => attachment.id !== bundledDefaultAttachment.id)
+  ];
 }
 
 function isTextDocument(file) {
