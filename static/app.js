@@ -330,7 +330,7 @@ function loadState() {
       attachments: Array.isArray(parsed.attachments)
         ? parsed.attachments.map(sanitizeAttachment).filter(Boolean)
         : [],
-      optionOrder: parsed.optionOrder || buildOptionOrderMap()
+      optionOrder: buildOptionOrderMap()
     };
 
     if (!nextState.profile.designerRole || nextState.profile.designerRole === "product designer") {
@@ -352,35 +352,13 @@ function cloneDefaultState() {
 function buildOptionOrderMap() {
   return Object.fromEntries(
     AXES.map((axis) => {
-      const levels = Object.keys(axis.options).map(Number);
-      const shuffled = seededShuffle(levels, hashString(axis.id));
-      const ordered =
-        shuffled.every((level, index) => level === levels[index]) ? [...shuffled].reverse() : shuffled;
+      const levels = Object.keys(axis.options)
+        .map(Number)
+        .sort((left, right) => left - right);
 
-      return [axis.id, ordered];
+      return [axis.id, levels];
     })
   );
-}
-
-function hashString(value) {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
-  }
-  return hash || 1;
-}
-
-function seededShuffle(items, seed) {
-  const result = [...items];
-  let currentSeed = seed;
-
-  for (let index = result.length - 1; index > 0; index -= 1) {
-    currentSeed = (currentSeed * 1664525 + 1013904223) >>> 0;
-    const swapIndex = currentSeed % (index + 1);
-    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
-  }
-
-  return result;
 }
 
 function persistState() {
