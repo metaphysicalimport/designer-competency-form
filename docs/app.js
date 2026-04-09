@@ -6,6 +6,7 @@ const BUNDLED_ATTACHMENT_ID = "builtin-product-designer-competencies";
 const BUNDLED_ATTACHMENT_NAME = "компетенции продуктового дизайнера.md";
 const BUNDLED_ATTACHMENT_URL = new URL("./product-designer-competencies.md", window.location.href).toString();
 const SERVER_EVALUATION_URL = "/api/evaluate";
+const REMOTE_SERVER_EVALUATION_URL = "https://designer-competency-form.vercel.app/api/evaluate";
 const SERVER_TRACKER_CONTEXT_URL = "/api/tracker_context";
 const SERVER_TRANSCRIPTION_URL = "/api/transcribe";
 const OPENAI_API_URL = "https://api.openai.com/v1/responses";
@@ -56,6 +57,15 @@ const MICROPHONE_ICON = `
   <svg class="button-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
     <path d="M8 10.5C9.38071 10.5 10.5 9.38071 10.5 8V4.5C10.5 3.11929 9.38071 2 8 2C6.61929 2 5.5 3.11929 5.5 4.5V8C5.5 9.38071 6.61929 10.5 8 10.5Z" stroke="currentColor" stroke-width="1.25"/>
     <path d="M3.5 7.5V8C3.5 10.4853 5.51472 12.5 8 12.5M12.5 7.5V8C12.5 10.4853 10.4853 12.5 8 12.5M8 12.5V14" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/>
+  </svg>
+`;
+const TRASH_ICON = `
+  <svg class="button-icon" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+    <path d="M4.5 6H13.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+    <path d="M7 8.25V12.25" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+    <path d="M11 8.25V12.25" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+    <path d="M6.25 3.75H11.75" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+    <path d="M5.25 6L5.7 13.04C5.76 13.93 6.5 14.62 7.39 14.62H10.61C11.5 14.62 12.24 13.93 12.3 13.04L12.75 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>
 `;
 const EVALUATION_INSTRUCTIONS = `
@@ -533,26 +543,17 @@ function render() {
       <h2>контекст оценки</h2>
       <div class="field-grid field-grid--double">
         ${renderInput("designerName", "имя дизайнера", state.profile.designerName, "например, алина")}
-        ${renderInput(
-          "designerRole",
-          "роль дизайнера",
-          state.profile.designerRole,
-          "например, старший дизайнер продукта"
-        )}
+        ${renderInput("designerRole", "роль дизайнера", state.profile.designerRole, "название должности")}
       </div>
       <div class="field-grid">
         ${renderTrackerTokenInput()}
       </div>
-      <div class="field-grid field-grid--triple">
-        ${renderSelect(
-          "assessmentPeriodPreset",
-          "период оценки",
-          state.profile.assessmentPeriodPreset,
-          PERIOD_PRESET_OPTIONS.map((option) => option.value),
-          PERIOD_PRESET_OPTIONS
-        )}
-        ${renderDateInput("assessmentStartDate", "с даты", state.profile.assessmentStartDate)}
-        ${renderDateInput("assessmentEndDate", "по дату", state.profile.assessmentEndDate)}
+      <div class="field-stack">
+        <h3 class="profile-subtitle">период оценки</h3>
+        <div class="field-grid field-grid--double field-grid--period">
+          ${renderDateInput("assessmentStartDate", "с даты", state.profile.assessmentStartDate)}
+          ${renderDateInput("assessmentEndDate", "по дату", state.profile.assessmentEndDate)}
+        </div>
       </div>
       <div class="field-grid">
         ${renderSelect("currentGrade", "текущий формальный грейд дизайнера", state.profile.currentGrade, GRADE_OPTIONS)}
@@ -704,9 +705,14 @@ function renderTrackerTokenInput() {
           data-lpignore="true"
           placeholder="${hasToken ? "вставь новый токен, чтобы заменить текущий" : "вставь OAuth-токен Трекера"}"
         />
-        <button class="button button-secondary" id="clear-tracker-token-button" type="button" ${
-          hasToken ? "" : "disabled"
-        }>удалить токен</button>
+        <button
+          class="button button-secondary icon-button tracker-token-clear"
+          id="clear-tracker-token-button"
+          type="button"
+          aria-label="удалить токен"
+          title="удалить токен"
+          ${hasToken ? "" : "disabled"}
+        >${TRASH_ICON}</button>
       </div>
       <span class="field-help">${
         hasToken
@@ -1997,8 +2003,16 @@ function shouldUseServerEvaluation() {
   return !window.location.hostname.endsWith("github.io");
 }
 
+function getServerEvaluationUrl() {
+  const host = String(window.location.hostname || "").trim().toLowerCase();
+  if (host === "127.0.0.1" || host === "localhost") {
+    return REMOTE_SERVER_EVALUATION_URL;
+  }
+  return SERVER_EVALUATION_URL;
+}
+
 async function requestServerEvaluation(cardMarkdown, trackerData = {}) {
-  const response = await fetch(SERVER_EVALUATION_URL, {
+  const response = await fetch(getServerEvaluationUrl(), {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
