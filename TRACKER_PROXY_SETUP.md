@@ -55,6 +55,13 @@
 python3 tracker_proxy_server.py
 ```
 
+Или в контейнере:
+
+```bash
+docker build -f tracker-proxy.Dockerfile -t tracker-proxy .
+docker run --env-file tracker-proxy.env.example -p 4040:4040 tracker-proxy
+```
+
 Сервис поднимется на:
 
 ```text
