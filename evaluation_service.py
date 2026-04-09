@@ -15,8 +15,8 @@ def normalize_env_token(value):
 
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1")
-OPENAI_LARGE_INPUT_MODEL = os.environ.get("OPENAI_LARGE_INPUT_MODEL", "gpt-4.1")
+OPENAI_MODEL = "gpt-5.4-pro-long-context"
+OPENAI_LARGE_INPUT_MODEL = "gpt-5.4-pro-long-context"
 OPENAI_MODEL_SWITCH_INPUT_TOKENS = max(1000, int(os.environ.get("OPENAI_MODEL_SWITCH_INPUT_TOKENS", "30000")))
 OPENAI_API_URL = "https://api.openai.com/v1/responses"
 
@@ -312,7 +312,7 @@ def request_openai_evaluation(evaluation_input):
         details = error.read().decode("utf-8", errors="replace")
         if error.code == 429 and "rate_limit_exceeded" in details and model_name == OPENAI_LARGE_INPUT_MODEL:
             raise RuntimeError(
-                "Запрос слишком большой даже после переключения на gpt-4.1. Нужно уменьшить объем входных данных: "
+                "Запрос слишком большой даже после переключения на long-context модель. Нужно уменьшить объем входных данных: "
                 "сократить result.json, вложения или контекст из Трекера."
             )
         raise RuntimeError(f"OpenAI вернул ошибку {error.code}: {details}")
