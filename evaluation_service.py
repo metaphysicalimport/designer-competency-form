@@ -195,6 +195,50 @@ def build_tracker_context(designer_name="", tracker_login=""):
     return render_tracker_context(user, issues)
 
 
+def build_tracker_context_from_token(
+    designer_name="",
+    tracker_login="",
+    tracker_token="",
+    period_start="",
+    period_end="",
+):
+    normalized_token = str(tracker_token or "").strip()
+    if not normalized_token:
+        raise RuntimeError("Не указан OAuth-токен Трекера.")
+
+    normalized_login = normalize_tracker_login(tracker_login)
+    if normalized_login:
+        user = {
+            "login": normalized_login,
+            "display": str(designer_name or normalized_login).strip() or normalized_login,
+            "first_name": "",
+            "last_name": "",
+        }
+    else:
+        user = resolve_tracker_user(designer_name, tracker_token=normalized_token)
+        if not user:
+            raise RuntimeError(
+                "Не удалось автоматически определить пользователя в Яндекс Трекере. Укажи логин дизайнера в поле \"логин в Трекере\"."
+            )
+
+    issues = fetch_tracker_issues(
+        user["login"],
+        tracker_token=normalized_token,
+        period_start=period_start,
+        period_end=period_end,
+    )
+    period_label = build_tracker_period_label(period_start=period_start, period_end=period_end)
+    if not issues:
+        return (
+            "## данные из Яндекс Трекера\n\n"
+            f"- дизайнер: {user['display']} ({user['login']})\n"
+            f"- период: {period_label}\n"
+            "- задач по фильтру не найдено\n"
+        )
+
+    return render_tracker_context(user, issues, period_label=period_label)
+
+
 def build_tracker_context_via_proxy(designer_name="", tracker_login=""):
     request_payload = {
         "designer_name": str(designer_name or "").strip(),
@@ -280,17 +324,17 @@ def humanize_tracker_error(error):
     return f"Данные из Яндекс Трекера временно недоступны: {message}"
 
 
-def resolve_tracker_user(identifier):
+def resolve_tracker_user(identifier, tracker_token=""):
     normalized = normalize_lookup_value(identifier)
     if not normalized:
         return None
 
-    direct_user = resolve_tracker_user_by_login(normalized)
+    direct_user = resolve_tracker_user_by_login(normalized, tracker_token=tracker_token)
     if direct_user:
         return direct_user
 
     encoded_query = quote(normalized)
-    payload = tracker_request_json(f"/v3/users?query={encoded_query}", method="GET")
+    payload = tracker_request_json(f"/v3/users?query={encoded_query}", method="GET", tracker_token=tracker_token)
     users = payload if isinstance(payload, list) else []
     if not users:
         return None
@@ -317,13 +361,13 @@ def resolve_tracker_user(identifier):
     }
 
 
-def resolve_tracker_user_by_login(login):
+def resolve_tracker_user_by_login(login, tracker_token=""):
     candidate = str(login or "").strip()
     if not candidate or " " in candidate:
         return None
 
     try:
-        payload = tracker_request_json(f"/v3/users/{quote(candidate)}", method="GET")
+        payload = tracker_request_json(f"/v3/users/{quote(candidate)}", method="GET", tracker_token=tracker_token)
     except RuntimeError:
         return None
 
@@ -342,11 +386,17 @@ def resolve_tracker_user_by_login(login):
     }
 
 
-def fetch_tracker_issues(login):
-    query = (
-        f'Assignee: {login}@ AND Updated: > today() - "{YANDEX_TRACKER_LOOKBACK_MONTHS}M" '
-        '"Sort by": Updated DESC'
-    )
+def fetch_tracker_issues(login, tracker_token="", period_start="", period_end=""):
+    if period_start and period_end:
+        query = (
+            f'Assignee: {login}@ AND Updated: >= "{period_start}" AND Updated: <= "{period_end}" '
+            '"Sort by": Updated DESC'
+        )
+    else:
+        query = (
+            f'Assignee: {login}@ AND Updated: > today() - "{YANDEX_TRACKER_LOOKBACK_MONTHS}M" '
+            '"Sort by": Updated DESC'
+        )
 
     issues = []
     page = 1
@@ -355,6 +405,7 @@ def fetch_tracker_issues(login):
             f"/v3/issues/_search?perPage={YANDEX_TRACKER_PAGE_SIZE}&page={page}",
             method="POST",
             payload={"query": query},
+            tracker_token=tracker_token,
         )
         batch = batch if isinstance(batch, list) else []
         if not batch:
@@ -369,11 +420,11 @@ def fetch_tracker_issues(login):
     return issues[:YANDEX_TRACKER_MAX_ISSUES]
 
 
-def tracker_request_json(path, method="GET", payload=None):
+def tracker_request_json(path, method="GET", payload=None, tracker_token=""):
     request = Request(
         f"{YANDEX_TRACKER_BASE_URL}{path}",
         data=json.dumps(payload).encode("utf-8") if payload is not None else None,
-        headers=build_tracker_headers(payload is not None),
+        headers=build_tracker_headers(payload is not None, tracker_token=tracker_token),
         method=method,
     )
 
@@ -387,15 +438,19 @@ def tracker_request_json(path, method="GET", payload=None):
         raise RuntimeError(f"Не удалось подключиться к Яндекс Трекеру: {error.reason}")
 
 
-def build_tracker_headers(has_json_body):
+def build_tracker_headers(has_json_body, tracker_token=""):
     headers = {"Accept": "application/json"}
 
-    if YANDEX_TRACKER_SERVICE_TICKET:
-        headers["X-Ya-Service-Ticket"] = YANDEX_TRACKER_SERVICE_TICKET
-    if YANDEX_TRACKER_USER_TICKET:
-        headers["X-Ya-User-Ticket"] = YANDEX_TRACKER_USER_TICKET
-    if not YANDEX_TRACKER_SERVICE_TICKET and not YANDEX_TRACKER_USER_TICKET and YANDEX_TRACKER_TOKEN:
-        headers["Authorization"] = f"OAuth {YANDEX_TRACKER_TOKEN}"
+    normalized_token = str(tracker_token or "").strip()
+    if normalized_token:
+        headers["Authorization"] = f"OAuth {normalized_token}"
+    else:
+        if YANDEX_TRACKER_SERVICE_TICKET:
+            headers["X-Ya-Service-Ticket"] = YANDEX_TRACKER_SERVICE_TICKET
+        if YANDEX_TRACKER_USER_TICKET:
+            headers["X-Ya-User-Ticket"] = YANDEX_TRACKER_USER_TICKET
+        if not YANDEX_TRACKER_SERVICE_TICKET and not YANDEX_TRACKER_USER_TICKET and YANDEX_TRACKER_TOKEN:
+            headers["Authorization"] = f"OAuth {YANDEX_TRACKER_TOKEN}"
 
     if (
         "Authorization" not in headers
@@ -444,7 +499,7 @@ def score_tracker_user_candidate(user, lookup):
     return 0
 
 
-def render_tracker_context(user, issues):
+def render_tracker_context(user, issues, period_label=""):
     queue_counts = {}
     status_counts = {}
     type_counts = {}
@@ -471,7 +526,7 @@ def render_tracker_context(user, issues):
         "## данные из Яндекс Трекера",
         "",
         f"- дизайнер: {user['display']} ({user['login']})",
-        f"- период: последние {YANDEX_TRACKER_LOOKBACK_MONTHS} месяца",
+        f"- период: {period_label or build_tracker_period_label()}",
         f"- найдено задач: {len(issues)}",
         f"- закрыто задач: {resolved_count}",
         f"- задач с описанием: {with_description_count}",
@@ -592,6 +647,14 @@ def format_tracker_date(value):
         return moment.astimezone(timezone.utc).strftime("%Y-%m-%d")
     except ValueError:
         return str(value)
+
+
+def build_tracker_period_label(period_start="", period_end=""):
+    normalized_start = str(period_start or "").strip()
+    normalized_end = str(period_end or "").strip()
+    if normalized_start and normalized_end:
+        return f"{normalized_start} — {normalized_end}"
+    return f"последние {YANDEX_TRACKER_LOOKBACK_MONTHS} месяца"
 
 
 def normalize_lookup_value(value):

@@ -6,6 +6,7 @@ const BUNDLED_ATTACHMENT_ID = "builtin-product-designer-competencies";
 const BUNDLED_ATTACHMENT_NAME = "компетенции продуктового дизайнера.md";
 const BUNDLED_ATTACHMENT_URL = new URL("./product-designer-competencies.md", window.location.href).toString();
 const SERVER_EVALUATION_URL = "/api/evaluate";
+const SERVER_TRACKER_CONTEXT_URL = "/api/tracker-context";
 const SERVER_TRANSCRIPTION_URL = "/api/transcribe";
 const OPENAI_API_URL = "https://api.openai.com/v1/responses";
 const OPENAI_TRANSCRIPTION_API_URL = "https://api.openai.com/v1/audio/transcriptions";
@@ -32,6 +33,12 @@ const TRACKER_EXCLUDED_QUEUE_KEYS = new Set([
 ]);
 const TRACKER_EXCLUDED_TYPE_KEYS = new Set(["newdocument", "education"]);
 const TRACKER_EXCLUDED_TYPE_NAMES = new Set(["новыйдокумент", "обучение"]);
+const TRACKER_NAME_LOGIN_MAP = {
+  [normalizeTrackerName("рома жигарёв")]: "roma-zhigarev",
+  [normalizeTrackerName("рома жигарев")]: "roma-zhigarev",
+  [normalizeTrackerName("тимур матвеев")]: "timur57",
+  [normalizeTrackerName("алина рябова")]: "alineria"
+};
 const MAX_AUDIO_BYTES = 64 * 1024 * 1024;
 const MAX_TRANSCRIPTION_CHUNK_BYTES = 3 * 1024 * 1024;
 const TOUCH_PROGRESS_DOCK_QUERY = "(pointer: coarse)";
@@ -1961,7 +1968,7 @@ async function requestEvaluation() {
   render();
 
   try {
-    const trackerData = await collectBrowserTrackerContext();
+    const trackerData = await collectTrackerContext();
     const evaluation = shouldUseServerEvaluation()
       ? await requestServerEvaluation(cardMarkdown, trackerData)
       : await requestClientEvaluation(cardMarkdown, trackerData);
@@ -2212,7 +2219,7 @@ function buildClientEvaluationInput(cardMarkdown, trackerData = {}) {
   return sections.filter(Boolean).join("\n\n").trim();
 }
 
-async function collectBrowserTrackerContext() {
+async function collectTrackerContext() {
   const designerName = String(state.profile.designerName || "").trim();
   if (!designerName) {
     return { trackerContext: "", trackerWarning: "" };
@@ -2229,10 +2236,47 @@ async function collectBrowserTrackerContext() {
     return {
       trackerContext: "",
       trackerWarning:
-        "Контекст из Трекера не добавлен: не указан OAuth-токен Трекера в этом браузере. Токен сохраняется только локально."
+        "Контекст из Трекера не добавлен: не указан OAuth-токен Трекера. Токен сохраняется только локально в этом браузере."
     };
   }
 
+  if (shouldUseServerEvaluation()) {
+    return requestServerTrackerContext(designerName, trackerToken, period);
+  }
+
+  return collectBrowserTrackerContextDirect(designerName, trackerToken, period);
+}
+
+async function requestServerTrackerContext(designerName, trackerToken, period) {
+  const response = await fetch(SERVER_TRACKER_CONTEXT_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      designer_name: designerName,
+      tracker_login: lookupKnownTrackerLoginByName(designerName),
+      tracker_token: trackerToken,
+      period_start: period.startDate,
+      period_end: period.endDate
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    return {
+      trackerContext: "",
+      trackerWarning: humanizeServerTrackerError(payload, response.status)
+    };
+  }
+
+  return {
+    trackerContext: String(payload.tracker_context || "").trim(),
+    trackerWarning: ""
+  };
+}
+
+async function collectBrowserTrackerContextDirect(designerName, trackerToken, period) {
   try {
     const trackerUser = await resolveTrackerUserFromBrowser(designerName, trackerToken);
     const issues = await fetchTrackerIssuesFromBrowser(trackerUser.login, trackerToken, period);
@@ -2287,7 +2331,7 @@ function setStoredOpenAIApiKey(value) {
 
 async function requestTrackerToken() {
   const promptedToken = window.prompt(
-    "вставь OAuth-токен Яндекс Трекера. он сохранится только в этом браузере и нужен, чтобы браузер мог напрямую сходить в Трекер, когда сеть пускает."
+    "вставь OAuth-токен Яндекс Трекера. он сохранится только в этом браузере и нужен, чтобы приложение могло запросить данные из Трекера."
   );
   const normalizedToken = String(promptedToken || "").trim();
   if (!normalizedToken) {
@@ -2437,6 +2481,14 @@ async function fetchTrackerIssuesFromBrowser(trackerLogin, trackerToken, period)
 }
 
 async function resolveTrackerUserFromBrowser(designerName, trackerToken) {
+  const knownLogin = lookupKnownTrackerLoginByName(designerName);
+  if (knownLogin) {
+    return {
+      login: knownLogin,
+      display: String(designerName || knownLogin).trim()
+    };
+  }
+
   const query = encodeURIComponent(String(designerName || "").trim());
   const response = await fetch(`${TRACKER_API_BASE_URL}/users?query=${query}`, {
     method: "GET",
@@ -2574,6 +2626,23 @@ function humanizeBrowserTrackerError(error) {
   );
 }
 
+function humanizeServerTrackerError(payload, status) {
+  const details =
+    (typeof payload?.error === "string" && payload.error.trim()) ||
+    extractTrackerApiError(payload, status) ||
+    "";
+
+  if (status === 401 || status === 403) {
+    return "Сервер не смог получить данные из Трекера. Проверь, что OAuth-токен актуален и у него есть доступ к нужным данным.";
+  }
+
+  if (status >= 500 && details) {
+    return `Не удалось получить данные из Трекера через сервер: ${details}`;
+  }
+
+  return details || "Не удалось получить данные из Трекера через сервер.";
+}
+
 function extractTrackerApiError(payload, status) {
   const errorMessage = Array.isArray(payload?.errorMessages) ? payload.errorMessages.join(" | ") : "";
   if (errorMessage.trim()) {
@@ -2689,6 +2758,12 @@ function pickBestTrackerUser(users, lookupName) {
   return candidates[0]?.user || null;
 }
 
+function lookupKnownTrackerLoginByName(value) {
+  const normalized = normalizeTrackerName(value);
+  const matched = TRACKER_NAME_LOGIN_MAP[normalized];
+  return matched ? normalizeTrackerLogin(matched) : "";
+}
+
 function scoreTrackerUserCandidate(user, normalizedLookup) {
   const login = normalizeTrackerName(user?.login);
   const display = normalizeTrackerName(user?.display);
@@ -2722,6 +2797,7 @@ function normalizeTrackerName(value) {
   return String(value || "")
     .trim()
     .toLowerCase()
+    .replace(/ё/g, "е")
     .replace(/\s+/g, " ");
 }
 
