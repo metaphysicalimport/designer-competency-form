@@ -38,7 +38,7 @@ class AppHandler(SimpleHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/api/evaluate":
             return self.handle_evaluation_request()
-        if self.path == "/api/tracker-context":
+        if self.path in {"/api/tracker-context", "/api/tracker_context"}:
             return self.handle_tracker_context_request()
         if self.path == "/api/transcribe":
             return self.handle_transcription_request()
