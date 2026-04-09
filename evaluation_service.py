@@ -15,8 +15,8 @@ def normalize_env_token(value):
 
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPENAI_MODEL = "gpt-5.4-pro-long-context"
-OPENAI_LARGE_INPUT_MODEL = "gpt-5.4-pro-long-context"
+OPENAI_MODEL = "gpt-5-pro"
+OPENAI_LARGE_INPUT_MODEL = "gpt-5-pro"
 OPENAI_MODEL_SWITCH_INPUT_TOKENS = max(1000, int(os.environ.get("OPENAI_MODEL_SWITCH_INPUT_TOKENS", "30000")))
 OPENAI_API_URL = "https://api.openai.com/v1/responses"
 
