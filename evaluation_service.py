@@ -88,20 +88,29 @@ def evaluate_designer(card_markdown, designer_name="", tracker_login=""):
         raise RuntimeError("На сервере не настроен OPENAI_API_KEY.")
 
     tracker_context = ""
+    tracker_warning = ""
     if designer_name or tracker_login:
-        tracker_context = build_tracker_context(designer_name=designer_name, tracker_login=tracker_login)
+        try:
+            tracker_context = build_tracker_context(designer_name=designer_name, tracker_login=tracker_login)
+        except RuntimeError as error:
+            tracker_warning = humanize_tracker_error(error)
 
     evaluation_text = request_openai_evaluation(
-        build_openai_input(card_markdown=normalized_card, tracker_context=tracker_context)
+        build_openai_input(
+            card_markdown=normalized_card,
+            tracker_context=tracker_context,
+            tracker_warning=tracker_warning,
+        )
     )
     return {
         "file_name": "designer-assessment-result.md",
         "content": evaluation_text,
         "tracker_context_used": bool(tracker_context),
+        "tracker_warning": tracker_warning or None,
     }
 
 
-def build_openai_input(card_markdown, tracker_context):
+def build_openai_input(card_markdown, tracker_context, tracker_warning=""):
     sections = [
         "# анкета для оценки дизайнера",
         "",
@@ -110,6 +119,15 @@ def build_openai_input(card_markdown, tracker_context):
 
     if tracker_context:
         sections.extend(["", tracker_context.strip()])
+    elif tracker_warning:
+        sections.extend(
+            [
+                "",
+                "## статус данных из Яндекс Трекера",
+                "",
+                tracker_warning.strip(),
+            ]
+        )
 
     return "\n".join(sections).strip()
 
@@ -120,10 +138,20 @@ def build_tracker_context(designer_name="", tracker_login=""):
             "На сервере не настроен YANDEX_TRACKER_TOKEN. Добавь токен Трекера в переменные окружения Vercel."
         )
 
-    user = resolve_tracker_user(tracker_login or designer_name)
-    if not user:
-        identifier = tracker_login or designer_name
-        raise RuntimeError(f'Не удалось найти пользователя "{identifier}" в Яндекс Трекере.')
+    normalized_login = normalize_tracker_login(tracker_login)
+    if normalized_login:
+        user = {
+            "login": normalized_login,
+            "display": str(designer_name or normalized_login).strip() or normalized_login,
+            "first_name": "",
+            "last_name": "",
+        }
+    else:
+        user = resolve_tracker_user(designer_name)
+        if not user:
+            raise RuntimeError(
+                "Не удалось автоматически определить пользователя в Яндекс Трекере. Укажи логин дизайнера в поле \"логин в Трекере\"."
+            )
 
     issues = fetch_tracker_issues(user["login"])
     if not issues:
@@ -169,6 +197,19 @@ def request_openai_evaluation(evaluation_input):
         raise RuntimeError("OpenAI не вернул текст оценки.")
 
     return output_text
+
+
+def humanize_tracker_error(error):
+    message = str(error).strip()
+    lowered = message.lower()
+
+    if "используйте tvm" in lowered or "use tvm" in lowered:
+        return (
+            "Яндекс Трекер отклонил OAuth-запрос с Vercel. Для автоматической server-side интеграции нужен TVM "
+            "или внутренний proxy внутри инфраструктуры Яндекса. Оценка ниже построена только по анкете и вложениям."
+        )
+
+    return f"Данные из Яндекс Трекера временно недоступны: {message}"
 
 
 def resolve_tracker_user(identifier):
@@ -475,6 +516,13 @@ def normalize_lookup_value(value):
     normalized = str(value or "").strip().lower()
     normalized = normalized.replace("@yandex-team.ru", "").replace("@", " ")
     normalized = re.sub(r"\s+", " ", normalized)
+    return normalized
+
+
+def normalize_tracker_login(value):
+    normalized = str(value or "").strip().lower()
+    normalized = normalized.replace("@yandex-team.ru", "").replace("@", "")
+    normalized = re.sub(r"\s+", "", normalized)
     return normalized
 
 

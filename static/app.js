@@ -1856,7 +1856,7 @@ async function requestEvaluation() {
       : await requestClientEvaluation(cardMarkdown);
 
     state.evaluation = evaluation;
-    state.error = "";
+    state.error = evaluation.trackerWarning || "";
   } catch (error) {
     const errorMessage =
       error instanceof TypeError
@@ -1900,7 +1900,8 @@ async function requestServerEvaluation(cardMarkdown) {
   return {
     status: "done",
     fileName: payload.file_name || "designer-assessment-result.md",
-    content: String(payload.content || "")
+    content: String(payload.content || ""),
+    trackerWarning: String(payload.tracker_warning || "").trim()
   };
 }
 
