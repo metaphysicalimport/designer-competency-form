@@ -27,6 +27,8 @@ class handler(BaseHTTPRequestHandler):
         card_markdown = str(payload.get("card_markdown") or "").strip()
         designer_name = str(payload.get("designer_name") or "").strip()
         tracker_login = str(payload.get("tracker_login") or "").strip()
+        tracker_context = str(payload.get("tracker_context") or "").strip()
+        tracker_warning = str(payload.get("tracker_warning") or "").strip()
         if not card_markdown:
             return self.respond_json({"error": "Пустая анкета. Нечего отправлять на оценку."}, status=400)
 
@@ -35,6 +37,8 @@ class handler(BaseHTTPRequestHandler):
                 card_markdown=card_markdown,
                 designer_name=designer_name,
                 tracker_login=tracker_login,
+                tracker_context_override=tracker_context,
+                tracker_warning_override=tracker_warning,
             )
         except ValueError as error:
             return self.respond_json({"error": str(error)}, status=400)

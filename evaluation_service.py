@@ -84,7 +84,13 @@ EVALUATION_INSTRUCTIONS = """
 """.strip()
 
 
-def evaluate_designer(card_markdown, designer_name="", tracker_login=""):
+def evaluate_designer(
+    card_markdown,
+    designer_name="",
+    tracker_login="",
+    tracker_context_override="",
+    tracker_warning_override="",
+):
     normalized_card = str(card_markdown or "").strip()
     if not normalized_card:
         raise ValueError("Пустая анкета. Нечего отправлять на оценку.")
@@ -92,9 +98,9 @@ def evaluate_designer(card_markdown, designer_name="", tracker_login=""):
     if not OPENAI_API_KEY:
         raise RuntimeError("На сервере не настроен OPENAI_API_KEY.")
 
-    tracker_context = ""
-    tracker_warning = ""
-    if designer_name or tracker_login:
+    tracker_context = str(tracker_context_override or "").strip()
+    tracker_warning = str(tracker_warning_override or "").strip()
+    if not tracker_context and not tracker_warning and (designer_name or tracker_login):
         try:
             tracker_context = build_tracker_context(designer_name=designer_name, tracker_login=tracker_login)
         except RuntimeError as error:

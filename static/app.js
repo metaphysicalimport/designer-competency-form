@@ -12,6 +12,21 @@ const OPENAI_TRANSCRIPTION_API_URL = "https://api.openai.com/v1/audio/transcript
 const OPENAI_MODEL = "gpt-4.1";
 const OPENAI_TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe";
 const OPENAI_KEY_STORAGE = "designer-competency-openai-key-v1";
+const TRACKER_API_BASE_URL = "https://st-api.yandex-team.ru/v3";
+const TRACKER_TOKEN_STORAGE = "designer-competency-tracker-token-v1";
+const TRACKER_LOOKBACK_MONTHS = 3;
+const TRACKER_MAX_ISSUES = 40;
+const TRACKER_PAGE_SIZE = 20;
+const TRACKER_DESCRIPTION_LIMIT = 360;
+const TRACKER_SNIPPET_LIMIT = 20;
+const TRACKER_EXCLUDED_QUEUE_KEYS = new Set([
+  "equipment",
+  "corporateethics",
+  "securityawareness",
+  "security_awareness"
+]);
+const TRACKER_EXCLUDED_TYPE_KEYS = new Set(["newdocument", "education"]);
+const TRACKER_EXCLUDED_TYPE_NAMES = new Set(["новыйдокумент", "обучение"]);
 const MAX_AUDIO_BYTES = 64 * 1024 * 1024;
 const MAX_TRANSCRIPTION_CHUNK_BYTES = 3 * 1024 * 1024;
 const TOUCH_PROGRESS_DOCK_QUERY = "(pointer: coarse)";
@@ -1851,12 +1866,13 @@ async function requestEvaluation() {
   render();
 
   try {
+    const trackerData = await collectBrowserTrackerContext();
     const evaluation = shouldUseServerEvaluation()
-      ? await requestServerEvaluation(cardMarkdown)
-      : await requestClientEvaluation(cardMarkdown);
+      ? await requestServerEvaluation(cardMarkdown, trackerData)
+      : await requestClientEvaluation(cardMarkdown, trackerData);
 
     state.evaluation = evaluation;
-    state.error = evaluation.trackerWarning || "";
+    state.error = evaluation.trackerWarning || trackerData.trackerWarning || "";
   } catch (error) {
     const errorMessage =
       error instanceof TypeError
@@ -1879,7 +1895,7 @@ function shouldUseServerEvaluation() {
   return !window.location.hostname.endsWith("github.io");
 }
 
-async function requestServerEvaluation(cardMarkdown) {
+async function requestServerEvaluation(cardMarkdown, trackerData = {}) {
   const response = await fetch(SERVER_EVALUATION_URL, {
     method: "POST",
     headers: {
@@ -1888,7 +1904,9 @@ async function requestServerEvaluation(cardMarkdown) {
     body: JSON.stringify({
       card_markdown: cardMarkdown,
       designer_name: state.profile.designerName,
-      tracker_login: state.profile.trackerLogin
+      tracker_login: state.profile.trackerLogin,
+      tracker_context: trackerData.trackerContext || "",
+      tracker_warning: trackerData.trackerWarning || ""
     })
   });
 
@@ -1905,7 +1923,7 @@ async function requestServerEvaluation(cardMarkdown) {
   };
 }
 
-async function requestClientEvaluation(cardMarkdown) {
+async function requestClientEvaluation(cardMarkdown, trackerData = {}) {
   const apiKey = await getOpenAIApiKey();
   const response = await fetch(OPENAI_API_URL, {
     method: "POST",
@@ -1916,7 +1934,7 @@ async function requestClientEvaluation(cardMarkdown) {
     body: JSON.stringify({
       model: OPENAI_MODEL,
       instructions: EVALUATION_INSTRUCTIONS,
-      input: cardMarkdown
+      input: buildClientEvaluationInput(cardMarkdown, trackerData)
     })
   });
 
@@ -1933,7 +1951,8 @@ async function requestClientEvaluation(cardMarkdown) {
   return {
     status: "done",
     fileName: "designer-assessment-result.md",
-    content
+    content,
+    trackerWarning: String(trackerData.trackerWarning || "").trim()
   };
 }
 
@@ -2084,6 +2103,57 @@ function clearEvaluationResult() {
   };
 }
 
+function buildClientEvaluationInput(cardMarkdown, trackerData = {}) {
+  const sections = [String(cardMarkdown || "").trim()];
+  const trackerContext = String(trackerData.trackerContext || "").trim();
+  const trackerWarning = String(trackerData.trackerWarning || "").trim();
+
+  if (trackerContext) {
+    sections.push(trackerContext);
+  } else if (trackerWarning) {
+    sections.push(["## статус данных из Яндекс Трекера", "", trackerWarning].join("\n"));
+  }
+
+  return sections.filter(Boolean).join("\n\n").trim();
+}
+
+async function collectBrowserTrackerContext() {
+  const trackerLogin = normalizeTrackerLogin(state.profile.trackerLogin);
+  if (!trackerLogin) {
+    return { trackerContext: "", trackerWarning: "" };
+  }
+
+  let trackerToken = getStoredTrackerToken();
+  if (!trackerToken) {
+    trackerToken = await requestTrackerToken();
+  }
+
+  if (!trackerToken) {
+    return {
+      trackerContext: "",
+      trackerWarning:
+        "Контекст из Трекера не добавлен: не указан OAuth-токен Трекера в этом браузере. Токен сохраняется только локально."
+    };
+  }
+
+  try {
+    const issues = await fetchTrackerIssuesFromBrowser(trackerLogin, trackerToken);
+    return {
+      trackerContext: renderTrackerContextForEvaluation({
+        designerName: state.profile.designerName,
+        trackerLogin,
+        issues
+      }),
+      trackerWarning: ""
+    };
+  } catch (error) {
+    return {
+      trackerContext: "",
+      trackerWarning: humanizeBrowserTrackerError(error)
+    };
+  }
+}
+
 async function getOpenAIApiKey() {
   const storedKey = getStoredOpenAIApiKey();
   if (storedKey) {
@@ -2114,6 +2184,289 @@ function setStoredOpenAIApiKey(value) {
   } catch (error) {
     return;
   }
+}
+
+async function requestTrackerToken() {
+  const promptedToken = window.prompt(
+    "вставь OAuth-токен Яндекс Трекера. он сохранится только в этом браузере и нужен, чтобы браузер мог напрямую сходить в Трекер, когда сеть пускает."
+  );
+  const normalizedToken = String(promptedToken || "").trim();
+  if (!normalizedToken) {
+    return "";
+  }
+
+  setStoredTrackerToken(normalizedToken);
+  return normalizedToken;
+}
+
+function getStoredTrackerToken() {
+  try {
+    return localStorage.getItem(TRACKER_TOKEN_STORAGE) || "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function setStoredTrackerToken(value) {
+  try {
+    localStorage.setItem(TRACKER_TOKEN_STORAGE, value);
+  } catch (error) {
+    return;
+  }
+}
+
+async function fetchTrackerIssuesFromBrowser(trackerLogin, trackerToken) {
+  const issues = [];
+  let page = 1;
+
+  while (issues.length < TRACKER_MAX_ISSUES) {
+    const response = await fetch(
+      `${TRACKER_API_BASE_URL}/issues/_search?perPage=${TRACKER_PAGE_SIZE}&page=${page}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `OAuth ${trackerToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          query: `Assignee: ${trackerLogin}@ AND Updated: > today() - "${TRACKER_LOOKBACK_MONTHS}M" "Sort by": Updated DESC`
+        })
+      }
+    );
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const trackerError = new Error(
+        extractTrackerApiError(payload, response.status) || `tracker request failed: ${response.status}`
+      );
+      trackerError.status = response.status;
+      throw trackerError;
+    }
+
+    const batch = Array.isArray(payload) ? payload : [];
+    if (!batch.length) {
+      break;
+    }
+
+    issues.push(...batch.filter(isRelevantTrackerIssue));
+    if (batch.length < TRACKER_PAGE_SIZE) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return issues.slice(0, TRACKER_MAX_ISSUES);
+}
+
+function renderTrackerContextForEvaluation({ designerName, trackerLogin, issues }) {
+  const safeIssues = Array.isArray(issues) ? issues : [];
+  if (!safeIssues.length) {
+    return [
+      "## данные из Яндекс Трекера",
+      "",
+      `- дизайнер: ${formatField(designerName || trackerLogin)} (${trackerLogin})`,
+      `- период: последние ${TRACKER_LOOKBACK_MONTHS} месяца`,
+      "- задач по фильтру не найдено"
+    ].join("\n");
+  }
+
+  const queueCounts = new Map();
+  const statusCounts = new Map();
+  const typeCounts = new Map();
+  let withDescriptionCount = 0;
+  let resolvedCount = 0;
+
+  safeIssues.forEach((issue) => {
+    const queueName = extractTrackerDisplay(issue?.queue);
+    const statusName = extractTrackerDisplay(issue?.status);
+    const typeName = extractTrackerDisplay(issue?.type);
+
+    if (queueName) {
+      queueCounts.set(queueName, (queueCounts.get(queueName) || 0) + 1);
+    }
+    if (statusName) {
+      statusCounts.set(statusName, (statusCounts.get(statusName) || 0) + 1);
+    }
+    if (typeName) {
+      typeCounts.set(typeName, (typeCounts.get(typeName) || 0) + 1);
+    }
+    if (normalizeTrackerDescription(issue).trim()) {
+      withDescriptionCount += 1;
+    }
+    if (issue?.resolvedAt) {
+      resolvedCount += 1;
+    }
+  });
+
+  const lines = [
+    "## данные из Яндекс Трекера",
+    "",
+    `- дизайнер: ${formatField(designerName || trackerLogin)} (${trackerLogin})`,
+    `- период: последние ${TRACKER_LOOKBACK_MONTHS} месяца`,
+    `- найдено задач: ${safeIssues.length}`,
+    `- закрыто задач: ${resolvedCount}`,
+    `- задач с описанием: ${withDescriptionCount}`,
+    `- основные очереди: ${formatTrackerCounter(queueCounts)}`,
+    `- статусы: ${formatTrackerCounter(statusCounts)}`,
+    `- типы задач: ${formatTrackerCounter(typeCounts)}`,
+    "",
+    "### последние задачи",
+    ""
+  ];
+
+  safeIssues.slice(0, TRACKER_SNIPPET_LIMIT).forEach((issue) => {
+    lines.push(...renderTrackerIssueSnippet(issue));
+  });
+
+  return lines.join("\n").trim();
+}
+
+function renderTrackerIssueSnippet(issue) {
+  const key = String(issue?.key || "").trim() || "без ключа";
+  const summary = String(issue?.summary || "").trim() || "без названия";
+  const queueName = extractTrackerDisplay(issue?.queue) || "без очереди";
+  const issueType = extractTrackerDisplay(issue?.type) || "без типа";
+  const status = extractTrackerDisplay(issue?.status) || "без статуса";
+  const updatedAt = formatTrackerIssueDate(issue?.updatedAt);
+  const resolvedAt = formatTrackerIssueDate(issue?.resolvedAt);
+  const description = trimTrackerText(normalizeTrackerDescription(issue), TRACKER_DESCRIPTION_LIMIT);
+
+  const lines = [
+    `- ${key} | ${summary}`,
+    `  очередь: ${queueName}; тип: ${issueType}; статус: ${status}; updated: ${updatedAt}${
+      resolvedAt ? `; resolved: ${resolvedAt}` : ""
+    }`
+  ];
+
+  if (description) {
+    lines.push(`  описание: ${description}`);
+  }
+
+  return lines;
+}
+
+function humanizeBrowserTrackerError(error) {
+  const message = String(error?.message || "").trim();
+  const status = Number(error?.status || 0);
+
+  if (status === 401 || status === 403) {
+    return "Не удалось получить данные из Трекера напрямую из браузера. Проверь, что OAuth-токен актуален и что твой доступ к Трекеру разрешен из текущей сети.";
+  }
+
+  if (error instanceof TypeError || /failed to fetch/i.test(message)) {
+    return "Не удалось сходить в Трекер напрямую из браузера. Скорее всего, нужен корпоративный Wi-Fi YTeam или VPN. В отчете будет оценка без контекста задач из Трекера.";
+  }
+
+  return (
+    message ||
+    "Не удалось получить данные из Трекера. В отчете будет оценка без контекста задач из Трекера."
+  );
+}
+
+function extractTrackerApiError(payload, status) {
+  const errorMessage = Array.isArray(payload?.errorMessages) ? payload.errorMessages.join(" | ") : "";
+  if (errorMessage.trim()) {
+    return errorMessage.trim();
+  }
+  if (typeof payload?.error === "string" && payload.error.trim()) {
+    return payload.error.trim();
+  }
+  return `не удалось получить данные из Трекера. статус ответа: ${status}`;
+}
+
+function isRelevantTrackerIssue(issue) {
+  if (!issue || typeof issue !== "object") {
+    return false;
+  }
+
+  const queueKey = normalizeTrackerKey(issue.queue?.key);
+  const queueDisplay = normalizeTrackerKey(issue.queue?.display);
+  const typeKey = normalizeTrackerKey(issue.type?.key);
+  const typeDisplay = normalizeTrackerKey(issue.type?.display);
+
+  if (TRACKER_EXCLUDED_QUEUE_KEYS.has(queueKey) || TRACKER_EXCLUDED_QUEUE_KEYS.has(queueDisplay)) {
+    return false;
+  }
+  if (TRACKER_EXCLUDED_TYPE_KEYS.has(typeKey)) {
+    return false;
+  }
+  if (TRACKER_EXCLUDED_TYPE_NAMES.has(typeDisplay)) {
+    return false;
+  }
+
+  return true;
+}
+
+function extractTrackerDisplay(value) {
+  if (value && typeof value === "object") {
+    return String(value.display || value.key || "").trim();
+  }
+  return "";
+}
+
+function normalizeTrackerDescription(issue) {
+  const rawDescription = String(issue?.description || "");
+  if (!rawDescription) {
+    return "";
+  }
+
+  return rawDescription
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$2")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function formatTrackerCounter(counterMap) {
+  const entries = Array.from(counterMap.entries());
+  if (!entries.length) {
+    return "нет данных";
+  }
+
+  return entries
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0], "ru"))
+    .slice(0, 5)
+    .map(([name, count]) => `${name} (${count})`)
+    .join(", ");
+}
+
+function formatTrackerIssueDate(value) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return date.toISOString().slice(0, 10);
+}
+
+function trimTrackerText(value, limit) {
+  const normalized = String(value || "").trim();
+  if (normalized.length <= limit) {
+    return normalized;
+  }
+  return `${normalized.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
+}
+
+function normalizeTrackerLogin(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/@yandex-team\.ru$/i, "")
+    .replace(/^@+/, "")
+    .replace(/\s+/g, "");
+}
+
+function normalizeTrackerKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9а-яё]+/gi, "");
 }
 
 function extractEvaluationText(payload) {

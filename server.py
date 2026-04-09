@@ -1,9 +1,12 @@
 import json
 import os
+import secrets
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+from evaluation_service import evaluate_designer
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -12,29 +15,8 @@ PORT = int(os.environ.get("PORT", "4020"))
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1")
 OPENAI_API_URL = "https://api.openai.com/v1/responses"
-EVALUATION_INSTRUCTIONS = """
-проанализируй содержимое анкеты, критерии карты компетенции, и подготовь оценку дизайнера, его грейд и точки роста.
-
-верни результат в markdown на русском языке.
-
-структура ответа:
-# оценка дизайнера
-
-## итог
-- рекомендуемый грейд
-- уверенность в оценке
-- краткий вывод
-
-## обоснование грейда
-
-## сильные стороны
-
-## точки роста
-
-## риски и пробелы в данных
-
-## рекомендации для следующего шага
-""".strip()
+OPENAI_TRANSCRIPTION_MODEL = os.environ.get("OPENAI_TRANSCRIPTION_MODEL", "gpt-4o-mini-transcribe")
+OPENAI_TRANSCRIPTION_API_URL = "https://api.openai.com/v1/audio/transcriptions"
 
 
 class AppHandler(SimpleHTTPRequestHandler):
@@ -54,10 +36,14 @@ class AppHandler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):
-        if self.path != "/api/evaluate":
-            self.send_error(404, "Not Found")
-            return
+        if self.path == "/api/evaluate":
+            return self.handle_evaluation_request()
+        if self.path == "/api/transcribe":
+            return self.handle_transcription_request()
+        self.send_error(404, "Not Found")
+        return
 
+    def handle_evaluation_request(self):
         content_length = int(self.headers.get("Content-Length", "0"))
         raw_body = self.rfile.read(content_length)
 
@@ -68,8 +54,50 @@ class AppHandler(SimpleHTTPRequestHandler):
             return
 
         card_markdown = str(payload.get("card_markdown") or "").strip()
+        designer_name = str(payload.get("designer_name") or "").strip()
+        tracker_login = str(payload.get("tracker_login") or "").strip()
+        tracker_context = str(payload.get("tracker_context") or "").strip()
+        tracker_warning = str(payload.get("tracker_warning") or "").strip()
         if not card_markdown:
             self.respond_json({"error": "Пустая анкета. Нечего отправлять на оценку."}, status=400)
+            return
+
+        try:
+            evaluation = evaluate_designer(
+                card_markdown=card_markdown,
+                designer_name=designer_name,
+                tracker_login=tracker_login,
+                tracker_context_override=tracker_context,
+                tracker_warning_override=tracker_warning,
+            )
+        except ValueError as error:
+            self.respond_json({"error": str(error)}, status=400)
+            return
+        except RuntimeError as error:
+            self.respond_json({"error": str(error)}, status=502)
+            return
+
+        self.respond_json(evaluation)
+
+    def handle_transcription_request(self):
+        content_length = int(self.headers.get("Content-Length", "0"))
+        raw_body = self.rfile.read(content_length)
+        content_type = self.headers.get("Content-Type", "")
+
+        if "application/json" in content_type:
+            try:
+                payload = json.loads(raw_body.decode("utf-8"))
+            except json.JSONDecodeError:
+                self.respond_json({"error": "Некорректный JSON в запросе."}, status=400)
+                return
+
+            audio_bytes, mime_type = parse_json_audio_payload(payload)
+        else:
+            audio_bytes = raw_body
+            mime_type = self.headers.get("X-Audio-Mime-Type") or content_type or "audio/webm"
+
+        if not audio_bytes:
+            self.respond_json({"error": "Пустая аудиозапись. Нечего отправлять на расшифровку."}, status=400)
             return
 
         if not OPENAI_API_KEY:
@@ -82,19 +110,14 @@ class AppHandler(SimpleHTTPRequestHandler):
             return
 
         try:
-            evaluation_text = request_openai_evaluation(card_markdown)
+            transcript_text = request_openai_transcription(audio_bytes, mime_type)
         except RuntimeError as error:
             self.respond_json({"error": str(error)}, status=502)
             return
 
-        self.respond_json(
-            {
-                "file_name": "designer-assessment-result.md",
-                "content": evaluation_text,
-            }
-        )
+        self.respond_json({"text": transcript_text})
 
-    def respond_json(self, payload, status=200):
+def respond_json(self, payload, status=200):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -103,19 +126,33 @@ class AppHandler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
 
-def request_openai_evaluation(card_markdown):
-    request_payload = {
-        "model": OPENAI_MODEL,
-        "instructions": EVALUATION_INSTRUCTIONS,
-        "input": card_markdown,
-    }
+def parse_json_audio_payload(payload):
+    import base64
+
+    audio_base64 = str(payload.get("audio_base64") or "").strip()
+    mime_type = str(payload.get("mime_type") or "audio/webm").strip() or "audio/webm"
+    if not audio_base64:
+        raise RuntimeError("Пустая аудиозапись. Нечего отправлять на расшифровку.")
+
+    try:
+        audio_bytes = base64.b64decode(audio_base64, validate=True)
+    except Exception as error:
+        raise RuntimeError("Не удалось декодировать аудиозапись.") from error
+
+    return audio_bytes, mime_type
+
+
+def request_openai_transcription(audio_bytes, mime_type):
+    boundary = f"----OpenAIBoundary{secrets.token_hex(16)}"
+    file_name = f"voice-note.{get_audio_extension(mime_type)}"
+    body = build_transcription_multipart_body(boundary, audio_bytes, file_name, mime_type)
 
     request = Request(
-        OPENAI_API_URL,
-        data=json.dumps(request_payload).encode("utf-8"),
+        OPENAI_TRANSCRIPTION_API_URL,
+        data=body,
         headers={
             "Authorization": f"Bearer {OPENAI_API_KEY}",
-            "Content-Type": "application/json",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
         },
         method="POST",
     )
@@ -130,26 +167,52 @@ def request_openai_evaluation(card_markdown):
         raise RuntimeError(f"Не удалось подключиться к OpenAI: {error.reason}")
 
     parsed = json.loads(response_body)
-    output_text = extract_output_text(parsed).strip()
-    if not output_text:
-        raise RuntimeError("OpenAI не вернул текст оценки.")
+    transcript_text = str(parsed.get("text") or "").strip()
+    if not transcript_text:
+        raise RuntimeError("OpenAI не вернул текст транскрибации.")
 
-    return output_text
+    return transcript_text
 
 
-def extract_output_text(payload):
-    direct_text = payload.get("output_text")
-    if isinstance(direct_text, str) and direct_text.strip():
-        return direct_text
+def build_transcription_multipart_body(boundary, audio_bytes, file_name, mime_type):
+    parts = []
 
-    output = payload.get("output") or []
-    fragments = []
-    for item in output:
-        for content in item.get("content", []):
-            if content.get("type") == "output_text" and content.get("text"):
-                fragments.append(content["text"])
+    for name, value in (
+        ("model", OPENAI_TRANSCRIPTION_MODEL),
+        ("language", "ru"),
+    ):
+        parts.append(
+            (
+                f"--{boundary}\r\n"
+                f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+                f"{value}\r\n"
+            ).encode("utf-8")
+        )
 
-    return "\n".join(fragments)
+    parts.append(
+        (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="file"; filename="{file_name}"\r\n'
+            f"Content-Type: {mime_type}\r\n\r\n"
+        ).encode("utf-8")
+    )
+    parts.append(audio_bytes)
+    parts.append(b"\r\n")
+    parts.append(f"--{boundary}--\r\n".encode("utf-8"))
+
+    return b"".join(parts)
+
+
+def get_audio_extension(mime_type):
+    if "wav" in mime_type or "wave" in mime_type:
+        return "wav"
+    if "mpeg" in mime_type or "mp3" in mime_type or "mpga" in mime_type:
+        return "mp3"
+    if "mp4" in mime_type:
+        return "mp4"
+    if "ogg" in mime_type:
+        return "ogg"
+    return "webm"
 
 
 def main():
