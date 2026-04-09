@@ -25,6 +25,11 @@ YANDEX_TRACKER_BASE_URL = os.environ.get("YANDEX_TRACKER_BASE_URL", "https://st-
 TRACKER_PROXY_URL = os.environ.get("TRACKER_PROXY_URL", "").strip()
 TRACKER_PROXY_TOKEN = os.environ.get("TRACKER_PROXY_TOKEN", "").strip()
 TRACKER_PROXY_TIMEOUT_SECONDS = max(5, int(os.environ.get("TRACKER_PROXY_TIMEOUT_SECONDS", "60")))
+ALLOW_DIRECT_TRACKER_SERVER_FETCH = os.environ.get("ALLOW_DIRECT_TRACKER_SERVER_FETCH", "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+}
 YANDEX_TRACKER_LOOKBACK_MONTHS = max(1, int(os.environ.get("YANDEX_TRACKER_LOOKBACK_MONTHS", "3")))
 YANDEX_TRACKER_MAX_ISSUES = max(1, int(os.environ.get("YANDEX_TRACKER_MAX_ISSUES", "40")))
 YANDEX_TRACKER_PAGE_SIZE = min(50, max(1, int(os.environ.get("YANDEX_TRACKER_PAGE_SIZE", "20"))))
@@ -100,7 +105,7 @@ def evaluate_designer(
 
     tracker_context = str(tracker_context_override or "").strip()
     tracker_warning = str(tracker_warning_override or "").strip()
-    if not tracker_context and not tracker_warning and (designer_name or tracker_login):
+    if not tracker_context and not tracker_warning and should_try_server_tracker_lookup(designer_name, tracker_login):
         try:
             tracker_context = build_tracker_context(designer_name=designer_name, tracker_login=tracker_login)
         except RuntimeError as error:
@@ -119,6 +124,14 @@ def evaluate_designer(
         "tracker_context_used": bool(tracker_context),
         "tracker_warning": tracker_warning or None,
     }
+
+
+def should_try_server_tracker_lookup(designer_name="", tracker_login=""):
+    if not (designer_name or tracker_login):
+        return False
+    if TRACKER_PROXY_URL:
+        return True
+    return ALLOW_DIRECT_TRACKER_SERVER_FETCH
 
 
 def build_openai_input(card_markdown, tracker_context, tracker_warning=""):
