@@ -71,6 +71,12 @@ const TRASH_ICON = `
 const EVALUATION_INSTRUCTIONS = `
 проанализируй содержимое анкеты, критерии карты компетенции, и подготовь оценку дизайнера, его грейд и точки роста.
 
+если среди приложений есть архив рабочей коммуникации, например result.json, извлекай из него косвенные сигналы: стиль взаимодействия, уровень самостоятельности, качество постановки вопросов, глубину аргументации, ownership, инициативность, влияние на решения, устойчивость в коммуникации, работу с неопределенностью, отношение к обратной связи и признаки лидерства.
+
+добавь эти наблюдения в отдельный раздел "## инсайты".
+
+в финальном тексте нельзя прямо писать, что инсайты или выводы сформированы на основании архива переписки, чата или переписки с дизайнером. формулируй их как наблюдения и выводы по совокупности материалов.
+
 верни результат в markdown на русском языке.
 
 структура ответа:
@@ -82,6 +88,8 @@ const EVALUATION_INSTRUCTIONS = `
 - краткий вывод
 
 ## обоснование грейда
+
+## инсайты
 
 ## сильные стороны
 
@@ -2197,10 +2205,7 @@ function buildMarkdownExport() {
   lines.push("");
 
   (state.attachments || []).forEach((attachment, index) => {
-    lines.push(`### приложение ${index + 1} - ${attachment.name}`);
-    lines.push("");
-    lines.push(formatAttachmentContent(attachment.content));
-    lines.push("");
+    lines.push(...buildAttachmentSection(attachment, index));
   });
 
   return lines.join("\n");
@@ -2883,6 +2888,37 @@ function formatParagraph(value) {
 function formatAttachmentContent(value) {
   const normalized = normalizeTextContent(value).trim();
   return normalized || "не заполнено";
+}
+
+function buildAttachmentSection(attachment, index) {
+  const safeAttachment = sanitizeAttachment(attachment, index);
+  if (!safeAttachment) {
+    return [];
+  }
+
+  const lines = [`### приложение ${index + 1} - ${safeAttachment.name}`, ""];
+  const analysisHint = getAttachmentAnalysisHint(safeAttachment.name);
+  if (analysisHint) {
+    lines.push(analysisHint, "");
+  }
+
+  lines.push(formatAttachmentContent(safeAttachment.content), "");
+  return lines;
+}
+
+function getAttachmentAnalysisHint(fileName) {
+  const normalizedName = String(fileName || "").trim().toLowerCase();
+  if (normalizedName !== "result.json") {
+    return "";
+  }
+
+  return [
+    "служебная пометка для анализа:",
+    "- это архив рабочей коммуникации; используй его как источник косвенных поведенческих и профессиональных сигналов",
+    "- извлекай инсайты про самостоятельность, инициативность, глубину мышления, коммуникацию, ownership, влияние на решения и работу с неопределенностью",
+    "- добавляй такие наблюдения в раздел \"инсайты\"",
+    "- в финальной резолюции не упоминай переписку, чат или архив как прямой источник этих выводов"
+  ].join("\n");
 }
 
 function toMarkdownBullets(items) {
