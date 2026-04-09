@@ -338,7 +338,6 @@ const DEFAULT_STATE = {
     evaluatorName: "",
     evaluatorRole: "",
     designerName: "",
-    trackerLogin: "",
     designerRole: "",
     assessmentPeriodPreset: "3m",
     assessmentStartDate: getDefaultPeriodRange("3m").startDate,
@@ -528,22 +527,16 @@ function render() {
       <div class="field-grid field-grid--double">
         ${renderInput("designerName", "имя дизайнера", state.profile.designerName, "например, алина")}
         ${renderInput(
-          "trackerLogin",
-          "логин в Трекере",
-          state.profile.trackerLogin,
-          "например, bolshakovd"
-        )}
-      </div>
-      <div class="field-grid field-grid--double">
-        ${renderInput(
           "designerRole",
           "роль дизайнера",
           state.profile.designerRole,
           "например, старший дизайнер продукта"
         )}
+      </div>
+      <div class="field-grid">
         ${renderTrackerTokenInput()}
       </div>
-      <div class="field-grid field-grid--double">
+      <div class="field-grid field-grid--triple">
         ${renderSelect(
           "assessmentPeriodPreset",
           "период оценки",
@@ -551,7 +544,8 @@ function render() {
           PERIOD_PRESET_OPTIONS.map((option) => option.value),
           PERIOD_PRESET_OPTIONS
         )}
-        ${renderDateRangeFields()}
+        ${renderDateInput("assessmentStartDate", "с даты", state.profile.assessmentStartDate)}
+        ${renderDateInput("assessmentEndDate", "по дату", state.profile.assessmentEndDate)}
       </div>
       <div class="field-grid">
         ${renderSelect("currentGrade", "текущий формальный грейд дизайнера", state.profile.currentGrade, GRADE_OPTIONS)}
@@ -676,15 +670,6 @@ function renderSelect(fieldId, label, value, options, optionDefinitions = null) 
   `;
 }
 
-function renderDateRangeFields() {
-  return `
-    <div class="field-grid field-grid--double">
-      ${renderDateInput("assessmentStartDate", "с даты", state.profile.assessmentStartDate)}
-      ${renderDateInput("assessmentEndDate", "по дату", state.profile.assessmentEndDate)}
-    </div>
-  `;
-}
-
 function renderDateInput(fieldId, label, value) {
   return `
     <div class="field">
@@ -698,9 +683,9 @@ function renderTrackerTokenInput() {
   const hasToken = Boolean(getStoredTrackerToken());
 
   return `
-    <div class="field">
+    <div class="field tracker-token-field">
       <label for="tracker-token">OAuth-токен Трекера</label>
-      <div class="field-grid field-grid--double">
+      <div class="tracker-token-controls">
         <input
           id="tracker-token"
           type="text"
@@ -716,7 +701,7 @@ function renderTrackerTokenInput() {
           hasToken ? "" : "disabled"
         }>удалить токен</button>
       </div>
-      <span class="voice-status">${
+      <span class="field-help">${
         hasToken
           ? "текущий токен сохранен только в этом браузере. если вставишь новый, он заменит старый."
           : "токен хранится только локально в этом браузере и используется для прямого запроса в Трекер."
@@ -2014,7 +1999,7 @@ async function requestServerEvaluation(cardMarkdown, trackerData = {}) {
     body: JSON.stringify({
       card_markdown: cardMarkdown,
       designer_name: state.profile.designerName,
-      tracker_login: state.profile.trackerLogin,
+      tracker_login: "",
       tracker_context: trackerData.trackerContext || "",
       tracker_warning: trackerData.trackerWarning || ""
     })
@@ -2118,7 +2103,6 @@ function buildMarkdownExport() {
     "",
     `- сгенерировано: ${formatTimestamp(new Date())}`,
     `- имя дизайнера: ${formatField(state.profile.designerName)}`,
-    `- логин в Трекере: ${formatField(state.profile.trackerLogin)}`,
     `- период оценки: ${formatAssessmentPeriodLabel()}`,
     `- роль дизайнера: ${formatField(state.profile.designerRole)}`,
     `- текущий формальный грейд дизайнера: ${formatField(state.profile.currentGrade)}`,
@@ -2229,8 +2213,8 @@ function buildClientEvaluationInput(cardMarkdown, trackerData = {}) {
 }
 
 async function collectBrowserTrackerContext() {
-  const trackerLogin = normalizeTrackerLogin(state.profile.trackerLogin);
-  if (!trackerLogin) {
+  const designerName = String(state.profile.designerName || "").trim();
+  if (!designerName) {
     return { trackerContext: "", trackerWarning: "" };
   }
   normalizeAssessmentPeriodRange();
@@ -2250,11 +2234,12 @@ async function collectBrowserTrackerContext() {
   }
 
   try {
-    const issues = await fetchTrackerIssuesFromBrowser(trackerLogin, trackerToken, period);
+    const trackerUser = await resolveTrackerUserFromBrowser(designerName, trackerToken);
+    const issues = await fetchTrackerIssuesFromBrowser(trackerUser.login, trackerToken, period);
     return {
       trackerContext: renderTrackerContextForEvaluation({
-        designerName: state.profile.designerName,
-        trackerLogin,
+        designerName,
+        trackerLogin: trackerUser.login,
         period,
         issues
       }),
@@ -2451,13 +2436,46 @@ async function fetchTrackerIssuesFromBrowser(trackerLogin, trackerToken, period)
   return issues.slice(0, TRACKER_MAX_ISSUES);
 }
 
+async function resolveTrackerUserFromBrowser(designerName, trackerToken) {
+  const query = encodeURIComponent(String(designerName || "").trim());
+  const response = await fetch(`${TRACKER_API_BASE_URL}/users?query=${query}`, {
+    method: "GET",
+    headers: {
+      Authorization: `OAuth ${trackerToken}`
+    }
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const trackerError = new Error(
+      extractTrackerApiError(payload, response.status) || `tracker user lookup failed: ${response.status}`
+    );
+    trackerError.status = response.status;
+    throw trackerError;
+  }
+
+  const users = Array.isArray(payload) ? payload : [];
+  const winner = pickBestTrackerUser(users, designerName);
+  if (!winner?.login) {
+    throw new Error(
+      "Не удалось найти дизайнера в Трекере по имени. Укажи имя и фамилию так же, как они записаны в Трекере."
+    );
+  }
+
+  return {
+    login: String(winner.login || "").trim(),
+    display: String(winner.display || designerName).trim()
+  };
+}
+
 function renderTrackerContextForEvaluation({ designerName, trackerLogin, period, issues }) {
+  const displayName = formatField(designerName || trackerLogin);
   const safeIssues = Array.isArray(issues) ? issues : [];
   if (!safeIssues.length) {
     return [
       "## данные из Яндекс Трекера",
       "",
-      `- дизайнер: ${formatField(designerName || trackerLogin)} (${trackerLogin})`,
+      `- дизайнер: ${displayName}`,
       `- период: ${period.startDate} — ${period.endDate}`,
       "- задач по фильтру не найдено"
     ].join("\n");
@@ -2494,7 +2512,7 @@ function renderTrackerContextForEvaluation({ designerName, trackerLogin, period,
   const lines = [
     "## данные из Яндекс Трекера",
     "",
-    `- дизайнер: ${formatField(designerName || trackerLogin)} (${trackerLogin})`,
+    `- дизайнер: ${displayName}`,
     `- период: ${period.startDate} — ${period.endDate}`,
     `- найдено задач: ${safeIssues.length}`,
     `- закрыто задач: ${resolvedCount}`,
@@ -2659,6 +2677,52 @@ function normalizeTrackerKey(value) {
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9а-яё]+/gi, "");
+}
+
+function pickBestTrackerUser(users, lookupName) {
+  const normalizedLookup = normalizeTrackerName(lookupName);
+  const candidates = (Array.isArray(users) ? users : [])
+    .map((user) => ({ user, score: scoreTrackerUserCandidate(user, normalizedLookup) }))
+    .filter((entry) => entry.score > 0)
+    .sort((left, right) => right.score - left.score);
+
+  return candidates[0]?.user || null;
+}
+
+function scoreTrackerUserCandidate(user, normalizedLookup) {
+  const login = normalizeTrackerName(user?.login);
+  const display = normalizeTrackerName(user?.display);
+  const fullName = normalizeTrackerName(`${user?.firstName || ""} ${user?.lastName || ""}`);
+  const dismissed = Boolean(user?.dismissed);
+
+  if (!login) {
+    return 0;
+  }
+  if (display === normalizedLookup || fullName === normalizedLookup) {
+    return dismissed ? 700 : 1000;
+  }
+  if (display.startsWith(normalizedLookup) || fullName.startsWith(normalizedLookup)) {
+    return dismissed ? 500 : 850;
+  }
+
+  const lookupTokens = new Set(normalizedLookup.split(" ").filter(Boolean));
+  const fullNameTokens = new Set(fullName.split(" ").filter(Boolean));
+  if (lookupTokens.size && [...lookupTokens].every((token) => fullNameTokens.has(token))) {
+    return (dismissed ? 300 : 700) + lookupTokens.size;
+  }
+
+  if (normalizedLookup && (display.includes(normalizedLookup) || fullName.includes(normalizedLookup))) {
+    return dismissed ? 250 : 500;
+  }
+
+  return 0;
+}
+
+function normalizeTrackerName(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
 }
 
 function extractEvaluationText(payload) {

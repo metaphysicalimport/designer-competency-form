@@ -15,6 +15,9 @@
   --space-5: 24px;
   --space-6: 32px;
   --space-7: 40px;
+  --shell-max-width: 712px;
+  --shell-inline-padding: 16px;
+  --progress-dock-height: 0px;
 }
 
 * {
@@ -97,9 +100,7 @@ h3 {
 }
 
 .field-help,
-.axis-description,
 .axis-prompts li,
-.footer-note,
 .progress-copy {
   color: var(--black-72);
   font-size: 14px;
@@ -110,6 +111,13 @@ h3 {
   display: grid;
   gap: var(--space-6);
   padding-top: var(--space-5);
+  position: relative;
+  isolation: isolate;
+}
+
+.progress-dock-anchor {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .progress-dock,
@@ -126,12 +134,32 @@ h3 {
 }
 
 .progress-dock {
-  position: sticky;
-  top: 0;
-  z-index: 4;
   display: grid;
   gap: var(--space-2);
   padding: var(--space-3);
+}
+
+.progress-dock.is-floating {
+  position: fixed;
+  top: max(0px, env(safe-area-inset-top));
+  left: 50%;
+  z-index: 1000;
+  width: min(
+    calc(100vw - (var(--shell-inline-padding) * 2)),
+    calc(var(--shell-max-width) - (var(--shell-inline-padding) * 2))
+  );
+  transform: translateX(-50%);
+}
+
+@media (pointer: coarse) {
+  .progress-dock.is-floating {
+    position: static;
+    top: auto;
+    left: auto;
+    z-index: auto;
+    width: auto;
+    transform: none;
+  }
 }
 
 .progress-dock-head,
@@ -265,9 +293,21 @@ h3 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.field-grid--triple {
+  grid-template-columns: 1.15fr repeat(2, minmax(0, 1fr));
+}
+
 .field,
 .textarea-field {
   display: grid;
+  gap: 8px;
+}
+
+.textarea-field-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
   gap: 8px;
 }
 
@@ -294,8 +334,21 @@ h3 {
   line-height: 1.35;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 input[type="text"],
 input[type="password"],
+input[type="date"],
 input[type="file"],
 select,
 textarea {
@@ -307,6 +360,7 @@ textarea {
 
 input[type="text"],
 input[type="password"],
+input[type="date"],
 select,
 textarea {
   border: 1px solid var(--black);
@@ -341,6 +395,7 @@ textarea::placeholder {
 
 input[type="text"]:focus,
 input[type="password"]:focus,
+input[type="date"]:focus,
 input[type="file"]:focus,
 select:focus,
 textarea:focus {
@@ -367,6 +422,30 @@ select {
   appearance: none;
 }
 
+input[type="date"] {
+  appearance: none;
+  min-height: 50px;
+}
+
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+}
+
+.tracker-token-field {
+  gap: 10px;
+}
+
+.tracker-token-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: stretch;
+}
+
+.tracker-token-controls .button {
+  min-width: 170px;
+}
+
 textarea {
   min-height: 112px;
   resize: vertical;
@@ -377,7 +456,7 @@ textarea {
 
 .axis-head {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--space-3);
   align-items: start;
 }
@@ -515,6 +594,37 @@ textarea {
   font-weight: 400;
 }
 
+.voice-trigger {
+  flex: 0 0 auto;
+}
+
+.voice-action-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.voice-action-button {
+  flex: 0 0 auto;
+}
+
+.voice-trigger.is-recording {
+  background: #b42318;
+  border-color: #b42318;
+  color: var(--white);
+}
+
+.voice-status {
+  color: var(--black-72);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.voice-status--error {
+  color: #b42318;
+}
+
 .loader-box {
   display: inline-flex;
   align-items: center;
@@ -586,10 +696,6 @@ textarea {
   line-height: 1.44;
 }
 
-.footer-note {
-  margin: 0;
-}
-
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -597,6 +703,11 @@ textarea {
 }
 
 @media (max-width: 719px) {
+  :root {
+    --shell-max-width: 704px;
+    --shell-inline-padding: 12px;
+  }
+
   .shell {
     width: min(100%, 704px);
     padding-top: 16px;
@@ -610,15 +721,27 @@ textarea {
 }
 
 @media (max-width: 520px) {
+  .axis-head,
   .field-grid--double,
+  .field-grid--triple,
   .progress-dock-head,
   .meta-row,
   .progress-dock-actions {
     grid-template-columns: 1fr;
   }
 
-  .field-grid--double {
+  .field-grid--double,
+  .field-grid--triple {
     display: grid;
+  }
+
+  .tracker-token-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .tracker-token-controls .button {
+    min-width: 0;
+    width: 100%;
   }
 
   .progress-dock-head,
