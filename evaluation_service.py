@@ -19,7 +19,12 @@ OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1")
 OPENAI_API_URL = "https://api.openai.com/v1/responses"
 
 YANDEX_TRACKER_TOKEN = os.environ.get("YANDEX_TRACKER_TOKEN", "")
+YANDEX_TRACKER_SERVICE_TICKET = os.environ.get("YANDEX_TRACKER_SERVICE_TICKET", "").strip()
+YANDEX_TRACKER_USER_TICKET = os.environ.get("YANDEX_TRACKER_USER_TICKET", "").strip()
 YANDEX_TRACKER_BASE_URL = os.environ.get("YANDEX_TRACKER_BASE_URL", "https://st-api.yandex-team.ru").rstrip("/")
+TRACKER_PROXY_URL = os.environ.get("TRACKER_PROXY_URL", "").strip()
+TRACKER_PROXY_TOKEN = os.environ.get("TRACKER_PROXY_TOKEN", "").strip()
+TRACKER_PROXY_TIMEOUT_SECONDS = max(5, int(os.environ.get("TRACKER_PROXY_TIMEOUT_SECONDS", "60")))
 YANDEX_TRACKER_LOOKBACK_MONTHS = max(1, int(os.environ.get("YANDEX_TRACKER_LOOKBACK_MONTHS", "3")))
 YANDEX_TRACKER_MAX_ISSUES = max(1, int(os.environ.get("YANDEX_TRACKER_MAX_ISSUES", "40")))
 YANDEX_TRACKER_PAGE_SIZE = min(50, max(1, int(os.environ.get("YANDEX_TRACKER_PAGE_SIZE", "20"))))
@@ -133,9 +138,15 @@ def build_openai_input(card_markdown, tracker_context, tracker_warning=""):
 
 
 def build_tracker_context(designer_name="", tracker_login=""):
-    if not YANDEX_TRACKER_TOKEN:
+    if TRACKER_PROXY_URL:
+        return build_tracker_context_via_proxy(
+            designer_name=designer_name,
+            tracker_login=tracker_login,
+        )
+
+    if not any((YANDEX_TRACKER_TOKEN, YANDEX_TRACKER_SERVICE_TICKET, YANDEX_TRACKER_USER_TICKET)):
         raise RuntimeError(
-            "На сервере не настроен YANDEX_TRACKER_TOKEN. Добавь токен Трекера в переменные окружения Vercel."
+            "На сервере не настроен ни TRACKER_PROXY_URL, ни прямой доступ к Трекеру через OAuth/TVM."
         )
 
     normalized_login = normalize_tracker_login(tracker_login)
@@ -163,6 +174,44 @@ def build_tracker_context(designer_name="", tracker_login=""):
         )
 
     return render_tracker_context(user, issues)
+
+
+def build_tracker_context_via_proxy(designer_name="", tracker_login=""):
+    request_payload = {
+        "designer_name": str(designer_name or "").strip(),
+        "tracker_login": str(tracker_login or "").strip(),
+        "lookback_months": YANDEX_TRACKER_LOOKBACK_MONTHS,
+        "max_issues": YANDEX_TRACKER_MAX_ISSUES,
+    }
+
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    if TRACKER_PROXY_TOKEN:
+        headers["Authorization"] = f"Bearer {TRACKER_PROXY_TOKEN}"
+
+    request = Request(
+        TRACKER_PROXY_URL,
+        data=json.dumps(request_payload).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+
+    try:
+        with urlopen(request, timeout=TRACKER_PROXY_TIMEOUT_SECONDS) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        details = error.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Внутренний proxy вернул ошибку {error.code}: {details}")
+    except URLError as error:
+        raise RuntimeError(f"Не удалось подключиться к внутреннему proxy: {error.reason}")
+
+    tracker_context = str(payload.get("tracker_context") or "").strip()
+    if not tracker_context:
+        raise RuntimeError("Внутренний proxy не вернул tracker_context.")
+
+    return tracker_context
 
 
 def request_openai_evaluation(evaluation_input):
@@ -320,10 +369,24 @@ def tracker_request_json(path, method="GET", payload=None):
 
 
 def build_tracker_headers(has_json_body):
-    headers = {
-        "Authorization": f"OAuth {YANDEX_TRACKER_TOKEN}",
-        "Accept": "application/json",
-    }
+    headers = {"Accept": "application/json"}
+
+    if YANDEX_TRACKER_SERVICE_TICKET:
+        headers["X-Ya-Service-Ticket"] = YANDEX_TRACKER_SERVICE_TICKET
+    if YANDEX_TRACKER_USER_TICKET:
+        headers["X-Ya-User-Ticket"] = YANDEX_TRACKER_USER_TICKET
+    if not YANDEX_TRACKER_SERVICE_TICKET and not YANDEX_TRACKER_USER_TICKET and YANDEX_TRACKER_TOKEN:
+        headers["Authorization"] = f"OAuth {YANDEX_TRACKER_TOKEN}"
+
+    if (
+        "Authorization" not in headers
+        and "X-Ya-Service-Ticket" not in headers
+        and "X-Ya-User-Ticket" not in headers
+    ):
+        raise RuntimeError(
+            "Не настроены credentials для Яндекс Трекера. Укажи TRACKER_PROXY_URL или TVM/OAuth переменные."
+        )
+
     if has_json_body:
         headers["Content-Type"] = "application/json"
     return headers
