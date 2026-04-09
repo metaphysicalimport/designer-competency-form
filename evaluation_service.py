@@ -16,6 +16,8 @@ def normalize_env_token(value):
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1")
+OPENAI_LARGE_INPUT_MODEL = os.environ.get("OPENAI_LARGE_INPUT_MODEL", "gpt-4.1")
+OPENAI_MODEL_SWITCH_INPUT_TOKENS = max(1000, int(os.environ.get("OPENAI_MODEL_SWITCH_INPUT_TOKENS", "30000")))
 OPENAI_API_URL = "https://api.openai.com/v1/responses"
 
 YANDEX_TRACKER_TOKEN = os.environ.get("YANDEX_TRACKER_TOKEN", "")
@@ -286,8 +288,9 @@ def build_tracker_context_via_proxy(designer_name="", tracker_login=""):
 
 
 def request_openai_evaluation(evaluation_input):
+    model_name = select_openai_model(evaluation_input)
     request_payload = {
-        "model": OPENAI_MODEL,
+        "model": model_name,
         "instructions": EVALUATION_INSTRUCTIONS,
         "input": evaluation_input,
     }
@@ -307,6 +310,11 @@ def request_openai_evaluation(evaluation_input):
             response_body = response.read().decode("utf-8")
     except HTTPError as error:
         details = error.read().decode("utf-8", errors="replace")
+        if error.code == 429 and "rate_limit_exceeded" in details and model_name == OPENAI_LARGE_INPUT_MODEL:
+            raise RuntimeError(
+                "Запрос слишком большой даже после переключения на gpt-4.1. Нужно уменьшить объем входных данных: "
+                "сократить result.json, вложения или контекст из Трекера."
+            )
         raise RuntimeError(f"OpenAI вернул ошибку {error.code}: {details}")
     except URLError as error:
         raise RuntimeError(f"Не удалось подключиться к OpenAI: {error.reason}")
@@ -317,6 +325,20 @@ def request_openai_evaluation(evaluation_input):
         raise RuntimeError("OpenAI не вернул текст оценки.")
 
     return output_text
+
+
+def select_openai_model(evaluation_input):
+    estimated_tokens = estimate_token_count(f"{EVALUATION_INSTRUCTIONS}\n\n{evaluation_input}")
+    if estimated_tokens >= OPENAI_MODEL_SWITCH_INPUT_TOKENS:
+        return OPENAI_LARGE_INPUT_MODEL
+    return OPENAI_MODEL
+
+
+def estimate_token_count(value):
+    normalized = str(value or "").strip()
+    if not normalized:
+        return 0
+    return max(1, len(normalized) // 4)
 
 
 def humanize_tracker_error(error):
