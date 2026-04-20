@@ -1,19 +1,30 @@
-const STORAGE_KEY = "designer-competency-app-v5";
-const OPTION_LABELS = ["a", "b", "c", "d", "e"];
+const STORAGE_KEY = "designer-expectations-app-v6";
 const GRADE_OPTIONS = ["14", "15", "16", "17", "18"];
 const TEXT_DOCUMENT_PATTERN = /\.(txt|md|markdown|csv|json|log|rtf|yaml|yml|xml|html?|css|js|ts|tsx|jsx)$/i;
-const BUNDLED_ATTACHMENT_ID = "builtin-product-designer-competencies";
-const BUNDLED_ATTACHMENT_NAME = "компетенции продуктового дизайнера.md";
-const BUNDLED_ATTACHMENT_URL = new URL("./product-designer-competencies.md", window.location.href).toString();
+const BUNDLED_ATTACHMENTS = [
+  {
+    id: "builtin-designer-expectations-map",
+    name: "Карта ожиданий - Музыка.md",
+    url: new URL("./product-designer-competencies.md", window.location.href).toString()
+  },
+  {
+    id: "builtin-designer-expectations-questionnaire",
+    name: "Карта ожиданий - Музыка-2.md",
+    url: new URL("./expectations-questionnaire.md", window.location.href).toString()
+  }
+];
 const SERVER_EVALUATION_URL = "/api/evaluate";
 const REMOTE_SERVER_EVALUATION_URL = "https://designer-competency-form.vercel.app/api/evaluate";
+const REMOTE_SERVER_ATTACHMENT_SUMMARY_URL = "https://designer-competency-form.vercel.app/api/attachment_summary";
 const SERVER_TRACKER_CONTEXT_URL = "/api/tracker_context";
 const SERVER_TRANSCRIPTION_URL = "/api/transcribe";
+const SERVER_ATTACHMENT_SUMMARY_URL = "/api/attachment_summary";
 const OPENAI_API_URL = "https://api.openai.com/v1/responses";
 const OPENAI_TRANSCRIPTION_API_URL = "https://api.openai.com/v1/audio/transcriptions";
 const OPENAI_MODEL = "gpt-5-pro";
 const OPENAI_TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe";
 const OPENAI_KEY_STORAGE = "designer-competency-openai-key-v1";
+const JSON_ATTACHMENT_SUMMARY_MARKER = "[json-attachment-summary-v2]";
 const TRACKER_API_BASE_URL = "https://st-api.yandex-team.ru/v3";
 const TRACKER_TOKEN_STORAGE = "designer-competency-tracker-token-v1";
 const TRACKER_MAX_ISSUES = 40;
@@ -69,7 +80,13 @@ const TRASH_ICON = `
   </svg>
 `;
 const EVALUATION_INSTRUCTIONS = `
-проанализируй содержимое анкеты, критерии карты компетенции, и подготовь оценку дизайнера, его грейд и точки роста.
+проанализируй содержимое анкеты по карте ожиданий дизайнера, саму карту ожиданий и подготовь оценку дизайнера, его грейд и точки роста.
+
+главный инструмент калибровки - карта ожиданий. смотри на устойчивые поведенческие паттерны, а не на единичные сильные кейсы. устойчивый паттерн - это минимум 3 кейса с использованием скилла или способа работы.
+
+не завышай оценку из-за участия в большой инициативе, если дизайнер не определял рамку, решение, направление или реальный масштаб влияния.
+
+разные оси могут быть на разных уровнях. итоговую калибровку собирай по общему паттерну, а не по одному сильному или слабому пункту.
 
 если среди приложений есть архив рабочей коммуникации, например result.json, извлекай из него косвенные сигналы: стиль взаимодействия, уровень самостоятельности, качество постановки вопросов, глубину аргументации, ownership, инициативность, влияние на решения, устойчивость в коммуникации, работу с неопределенностью, отношение к обратной связи и признаки лидерства.
 
@@ -88,6 +105,8 @@ const EVALUATION_INSTRUCTIONS = `
 - краткий вывод
 
 ## обоснование грейда
+
+## разбор по осям
 
 ## инсайты
 
@@ -225,151 +244,18 @@ const AXES = [
   }
 ];
 
-const IDEAL_DESIGNER_SECTIONS = [
-  {
-    id: "solution_generation",
-    stage: "дискавери этап",
-    title: "генерация решений и сценарное мышление",
-    bullets: [
-      "умеет смотреть на задачу целиком, а не только на отдельный экран",
-      "предлагает несколько осмысленных вариантов решения, а не первый очевидный",
-      "видит последствия решений в соседних состояниях, переходах и флоу"
-    ]
-  },
-  {
-    id: "aesthetics",
-    stage: "дискавери этап",
-    title: "эстетика",
-    bullets: [
-      "чувствует визуальную планку продукта и умеет собирать цельные, аккуратные и выразительные интерфейсы",
-      "работает с типографикой, цветом, композицией, ритмом и компонентами не формально, а как с частью качества решения",
-      "держит связь между продуктом, брендом и визуальным языком",
-      "умеет искать релевантные рефы и на их основе собирать собственное решение, а не копировать чужое",
-      "на этапе поиска решения не сводит работу только к функциональности, а думает и про лук-энд-фил"
-    ]
-  },
-  {
-    id: "user_research",
-    stage: "дискавери этап",
-    title: "юзер ресерч",
-    bullets: [
-      "умеет сформулировать, что именно нужно проверить и зачем",
-      "может собрать базовый план ресерча - гипотезы, формат, вопросы, сценарий проведения",
-      "выделяет из наблюдений и ответов понятные инсайты, а не просто пересказывает материал",
-      "переводит результаты ресерча в рекомендации для продукта и дизайна",
-      "умеет донести выводы до команды так, чтобы они повлияли на решения"
-    ]
-  },
-  {
-    id: "frameworks_analytics",
-    stage: "дискавери этап",
-    title: "продуктовое мышление и аналитика",
-    bullets: [
-      "умеет связывать дизайн-решения с целями продукта, пользовательской ценностью и метриками",
-      "понимает, какие данные помогают принять решение, и умеет на них опираться",
-      "может использовать фреймворки приоритизации и структурирования, если это помогает команде сфокусироваться",
-      "не просто смотрит на цифры, а умеет делать из них выводы для продукта и дизайна",
-      "видит не только качество интерфейса, но и влияние решения на продукт целиком"
-    ]
-  },
-  {
-    id: "design_pitching",
-    stage: "дискавери этап",
-    title: "дизайн питчинг",
-    bullets: [
-      "умеет ясно объяснять логику своих решений",
-      "может защищать решение через аргументы, а не через вкус или давление",
-      "учитывает контекст стейкхолдеров и подбирает понятный для них способ подачи",
-      "умеет обсуждать альтернативы и ограничения без потери сути решения",
-      "может продвигать сильное решение даже в сложной коммуникационной среде"
-    ]
-  },
-  {
-    id: "empathy_compromises",
-    stage: "дискавери этап",
-    title: "эмпатия и взаимодействие",
-    bullets: [
-      "слышит ограничения команды и продукта, не теряя при этом планку качества",
-      "умеет искать консенсус, который сохраняет смысл решения, а не просто упрощает его",
-      "не застревает в позиции \"либо идеально, либо никак\"",
-      "ищет обходные пути, если появляются блокеры по срокам, ресурсам или технологии",
-      "умеет договариваться так, чтобы команда двигалась вперед, а качество не разваливалось"
-    ]
-  },
-  {
-    id: "critique_response",
-    stage: "дискавери этап",
-    title: "работа с фидбэком",
-    bullets: [
-      "спокойно принимает фидбэк и не уходит в защиту там, где нужно услышать суть",
-      "умеет отделять оценку решения от оценки себя",
-      "может переосмыслить решение после обратной связи, если аргументы сильные",
-      "не цепляется за первую версию только потому, что уже вложился в нее",
-      "использует фидбэк как способ усилить решение, а не как формальную помеху"
-    ]
-  },
-  {
-    id: "work_speed",
-    stage: "деливери этап",
-    title: "эффективность работы",
-    bullets: [
-      "умеет двигаться с хорошей скоростью без заметной просадки по качеству",
-      "не тратит лишнее время на очевидные вещи и умеет выбирать нужную глубину проработки",
-      "использует подходы и инструменты, которые реально ускоряют работу и улучшают результат",
-      "по мере роста задач повышает не только скорость, но и личную эффективность",
-      "умеет держать темп на дистанции, а не только в режиме разового рывка"
-    ]
-  },
-  {
-    id: "flow_detailing",
-    stage: "деливери этап",
-    title: "проработка флоу и системность",
-    bullets: [
-      "прорабатывает основные и пограничные сценарии, состояния и ошибки",
-      "думает о связности флоу, а не только о ключевом хэппи пассе",
-      "учитывает платформенные гайдлайны, продуктовые паттерны и дизайн-систему",
-      "умеет формулировать или дособирать микрокопи, если это нужно для качества решения",
-      "передает решение в разработку в достаточно полном и понятном виде"
-    ]
-  },
-  {
-    id: "handoff_and_production",
-    stage: "деливери этап",
-    title: "хэнд-офф и ответственность за прод",
-    bullets: [
-      "не считает задачу законченной на этапе макетов",
-      "сопровождает решение в разработке и участвует в дизайн-ревью по ходу реализации",
-      "замечает расхождения между макетами и продом и помогает их исправлять",
-      "если в реализации появляются ограничения, умеет вместе с командой находить достойные альтернативы",
-      "держит ответственность за качество решения до момента, когда оно реально заработало в продукте"
-    ]
-  },
-  {
-    id: "shared_contribution",
-    stage: "общее дело",
-    title: "общее дело",
-    bullets: [
-      "вклад в общую планку качества",
-      "развитие способов работы",
-      "усиление других дизайнеров",
-      "инициативы, которые улучшают систему, а не только локальный результат",
-      "вклад в общую ясность, культуру решений и силу дизайн-функции"
-    ]
-  }
-];
-
 const DEFAULT_STATE = {
   profile: {
-    evaluatorName: "",
-    evaluatorRole: "",
+    reviewType: "",
     designerName: "",
-    designerRole: "",
+    filledBy: "",
     assessmentPeriodPreset: "3m",
     assessmentStartDate: getDefaultPeriodRange("3m").startDate,
     assessmentEndDate: getDefaultPeriodRange("3m").endDate,
     currentGrade: "",
-    targetGrade: "",
-    context: ""
+    teamOrDirection: "",
+    context: "",
+    periodTaskContext: ""
   },
   axes: Object.fromEntries(
     AXES.map((axis) => [
@@ -380,15 +266,6 @@ const DEFAULT_STATE = {
         selectedStatement: "",
         selectedStatements: [],
         evidence: ""
-      }
-    ])
-  ),
-  idealRatings: Object.fromEntries(
-    IDEAL_DESIGNER_SECTIONS.map((section) => [
-      section.id,
-      {
-        score: "",
-        comment: ""
       }
     ])
   ),
@@ -406,7 +283,7 @@ const DEFAULT_STATE = {
 
 let state = loadState();
 const app = document.getElementById("app");
-let bundledDefaultAttachment = null;
+let bundledDefaultAttachments = [];
 const voiceRecorder = {
   status: "idle",
   targetFieldId: "",
@@ -417,6 +294,7 @@ let activeMediaRecorder = null;
 let activeMediaStream = null;
 let activeMediaChunks = [];
 let activeMediaMimeType = "";
+let attachmentProcessingStatus = "";
 
 init();
 
@@ -447,10 +325,6 @@ function loadState() {
         ...cloneDefaultState().axes,
         ...(parsed.axes || {})
       },
-      idealRatings: {
-        ...cloneDefaultState().idealRatings,
-        ...(parsed.idealRatings || {})
-      },
       voiceDrafts: {
         ...cloneDefaultState().voiceDrafts,
         ...(parsed.voiceDrafts || {})
@@ -464,10 +338,6 @@ function loadState() {
         : [],
       optionOrder: buildOptionOrderMap()
     };
-
-    if (!nextState.profile.designerRole || nextState.profile.designerRole === "product designer") {
-      nextState.profile.designerRole = cloneDefaultState().profile.designerRole;
-    }
 
     nextState.attachments = mergeDefaultAttachments(nextState.attachments);
     nextState.axes = Object.fromEntries(
@@ -501,7 +371,6 @@ function persistState() {
     ...state,
     profile: { ...state.profile },
     axes: JSON.parse(JSON.stringify(state.axes)),
-    idealRatings: JSON.parse(JSON.stringify(state.idealRatings)),
     evaluation: { ...state.evaluation },
     attachments: JSON.parse(JSON.stringify(state.attachments || [])),
     optionOrder: JSON.parse(JSON.stringify(state.optionOrder))
@@ -518,17 +387,12 @@ function persistState() {
 }
 
 function getAnsweredCount() {
-  const axesAnswered = AXES.filter((axis) => Number(state.axes[axis.id].selectedLevel) >= 14).length;
-  const ratingsAnswered = IDEAL_DESIGNER_SECTIONS.filter(
-    (section) => Number(state.idealRatings?.[section.id]?.score) >= 1
-  ).length;
-
-  return axesAnswered + ratingsAnswered;
+  return AXES.filter((axis) => Number(state.axes[axis.id].selectedLevel) >= 14).length;
 }
 
 function render() {
   const answeredCount = getAnsweredCount();
-  const totalCount = AXES.length + IDEAL_DESIGNER_SECTIONS.length;
+  const totalCount = AXES.length;
   const progress = Math.round((answeredCount / totalCount) * 100);
 
   app.innerHTML = `
@@ -548,10 +412,14 @@ function render() {
     </div>
 
     <section class="profile-card">
-      <h2>контекст оценки</h2>
+      <h2>базовая информация</h2>
       <div class="field-grid field-grid--double">
+        ${renderInput("reviewType", "тип ревью", state.profile.reviewType, "например, pr или mr")}
         ${renderInput("designerName", "имя дизайнера", state.profile.designerName, "например, алина")}
-        ${renderInput("designerRole", "роль дизайнера", state.profile.designerRole, "название должности")}
+      </div>
+      <div class="field-grid field-grid--double">
+        ${renderInput("filledBy", "кто заполняет", state.profile.filledBy, "лид, арт-директор, менеджер")}
+        ${renderInput("teamOrDirection", "команда / направление", state.profile.teamOrDirection, "например, b2c")}
       </div>
       <div class="field-grid">
         ${renderTrackerTokenInput()}
@@ -574,6 +442,14 @@ function render() {
           "опиши контекст команды, домен, тип задач дизайнера, уровень автономности, с кем он взаимодействует и за что отвечает.",
         textareaAttributes: 'data-field="profile.context"'
       })}
+      ${renderCommentField({
+        fieldId: "profile-period-task-context",
+        label: "контекст задач за период",
+        value: state.profile.periodTaskContext,
+        placeholder:
+          "перечисли ключевые проекты, инициативы, большие куски работы и важные изменения за оцениваемый период.",
+        textareaAttributes: 'data-field="profile.periodTaskContext"'
+      })}
     </section>
 
     <section class="section-divider">
@@ -582,16 +458,10 @@ function render() {
 
     ${AXES.map(renderAxisCard).join("")}
 
-    <section class="section-divider">
-      <h2 class="section-divider-title">оценка по навыкам</h2>
-    </section>
-
-    ${renderIdealDesignerSections()}
-
     <section class="profile-card">
       ${renderCommentField({
         fieldId: "general-notes",
-        label: "комментарий",
+        label: "дополнительные комментарии",
         value: state.generalNotes,
         placeholder:
           "например: сильные стороны, зоны роста, важные наблюдения, сомнения по калибровке или дополнительные сигналы, которые стоит учесть в оценке.",
@@ -610,6 +480,7 @@ function render() {
           multiple
         />
       </div>
+      ${renderAttachmentProcessingState()}
       ${renderAttachmentList()}
     </section>
 
@@ -876,7 +747,7 @@ function renderAxisCard(axis, index) {
         ${getDisplayOptions(axis)
           .map(({ level, statement }, displayIndex) => {
             const isSelected = selectedLevel === Number(level);
-            const optionLabel = OPTION_LABELS[displayIndex] || String(displayIndex + 1);
+            const optionLabel = String(level);
 
             return `
               <label class="grade-option ${isSelected ? "is-selected" : ""}">
@@ -903,70 +774,6 @@ function renderAxisCard(axis, index) {
         value: axisState.evidence,
         placeholder: "опиши наблюдения, примеры и сигналы по этой оси.",
         textareaAttributes: `data-evidence-axis="${axis.id}"`
-      })}
-    </section>
-  `;
-}
-
-function renderIdealDesignerSections() {
-  const grouped = IDEAL_DESIGNER_SECTIONS.reduce((accumulator, section) => {
-    if (!accumulator[section.stage]) {
-      accumulator[section.stage] = [];
-    }
-    accumulator[section.stage].push(section);
-    return accumulator;
-  }, {});
-
-  return Object.entries(grouped)
-    .map(
-      ([stage, sections]) => `
-        <section class="profile-card">
-          <h2 class="subsection-title">${escapeHtml(stage)}</h2>
-          <div class="ideal-stack">
-            ${sections.map(renderIdealDesignerCard).join("")}
-          </div>
-        </section>
-      `
-    )
-    .join("");
-}
-
-function renderIdealDesignerCard(section) {
-  const ratingState = state.idealRatings?.[section.id] || { score: "", comment: "" };
-
-  return `
-    <section class="rating-card">
-      <div class="rating-card-head">
-        <h3>${escapeHtml(section.title)}</h3>
-      </div>
-      <ul class="axis-prompts">
-        ${section.bullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join("")}
-      </ul>
-      <div class="score-row">
-        ${[1, 2, 3, 4, 5]
-          .map((score) => {
-            const isSelected = Number(ratingState.score) === score;
-            return `
-              <label class="score-pill ${isSelected ? "is-selected" : ""}">
-                <input
-                  type="radio"
-                  name="score-${section.id}"
-                  value="${score}"
-                  data-rating-section="${section.id}"
-                  ${isSelected ? "checked" : ""}
-                />
-                <span>${score}</span>
-              </label>
-            `;
-          })
-          .join("")}
-      </div>
-      ${renderCommentField({
-        fieldId: `rating-comment-${section.id}`,
-        label: "комментарий",
-        value: ratingState.comment,
-        placeholder: "опиши, почему поставлена такая оценка по этому навыку.",
-        textareaAttributes: `data-rating-comment="${section.id}"`
       })}
     </section>
   `;
@@ -1009,6 +816,18 @@ function renderAttachmentList() {
   return `
     <div class="attachment-list">
       ${attachments.map((attachment, index) => renderAttachmentCard(attachment, index)).join("")}
+    </div>
+  `;
+}
+
+function renderAttachmentProcessingState() {
+  if (!attachmentProcessingStatus) {
+    return "";
+  }
+
+  return `
+    <div class="meta-row">
+      <span class="mini-chip">${escapeHtml(attachmentProcessingStatus)}</span>
     </div>
   `;
 }
@@ -1063,14 +882,6 @@ function attachEvents() {
 
   document.querySelectorAll("[data-evidence-axis]").forEach((node) => {
     node.addEventListener("input", handleEvidenceInput);
-  });
-
-  document.querySelectorAll('input[type="radio"][data-rating-section]').forEach((node) => {
-    node.addEventListener("change", handleRatingScoreChange);
-  });
-
-  document.querySelectorAll("[data-rating-comment]").forEach((node) => {
-    node.addEventListener("input", handleRatingCommentInput);
   });
 
   document.querySelectorAll('input[type="radio"][data-axis]').forEach((node) => {
@@ -1171,25 +982,6 @@ function handleTrackerTokenClear() {
 function handleEvidenceInput(event) {
   const axisId = event.target.dataset.evidenceAxis;
   state.axes[axisId].evidence = event.target.value;
-  state.error = "";
-  clearEvaluationResult();
-  if (!persistState()) {
-    render();
-  }
-}
-
-function handleRatingScoreChange(event) {
-  const sectionId = event.target.dataset.ratingSection;
-  state.idealRatings[sectionId].score = Number(event.target.value);
-  state.error = "";
-  clearEvaluationResult();
-  persistState();
-  render();
-}
-
-function handleRatingCommentInput(event) {
-  const sectionId = event.target.dataset.ratingComment;
-  state.idealRatings[sectionId].comment = event.target.value;
   state.error = "";
   clearEvaluationResult();
   if (!persistState()) {
@@ -1874,6 +1666,11 @@ function applyTranscriptToComment(fieldId, transcript) {
     return;
   }
 
+  if (fieldId === "profile-period-task-context") {
+    state.profile.periodTaskContext = appendTranscript(state.profile.periodTaskContext, normalizedTranscript);
+    return;
+  }
+
   if (fieldId === "general-notes") {
     state.generalNotes = appendTranscript(state.generalNotes, normalizedTranscript);
     return;
@@ -1883,17 +1680,6 @@ function applyTranscriptToComment(fieldId, transcript) {
     const axisId = fieldId.replace("evidence-", "");
     if (state.axes[axisId]) {
       state.axes[axisId].evidence = appendTranscript(state.axes[axisId].evidence, normalizedTranscript);
-    }
-    return;
-  }
-
-  if (fieldId.startsWith("rating-comment-")) {
-    const sectionId = fieldId.replace("rating-comment-", "");
-    if (state.idealRatings[sectionId]) {
-      state.idealRatings[sectionId].comment = appendTranscript(
-        state.idealRatings[sectionId].comment,
-        normalizedTranscript
-      );
     }
   }
 }
@@ -1929,6 +1715,8 @@ async function handleAttachmentUpload(event) {
   const previousAttachments = Array.isArray(state.attachments) ? [...state.attachments] : [];
   state.error = "";
   clearEvaluationResult();
+  attachmentProcessingStatus = "сжимаю json по смыслу...";
+  render();
 
   try {
     const invalidFile = files.find((file) => !isTextDocument(file));
@@ -1940,12 +1728,14 @@ async function handleAttachmentUpload(event) {
 
     const nextAttachments = await Promise.all(files.map(readTextAttachment));
     state.attachments = mergeDefaultAttachments([...previousAttachments, ...nextAttachments]);
+    attachmentProcessingStatus = "";
 
     if (!persistState()) {
       state.attachments = previousAttachments;
       persistState();
     }
   } catch (error) {
+    attachmentProcessingStatus = "";
     state.attachments = previousAttachments;
     state.error = error.message || "не удалось прочитать загруженные документы.";
     persistState();
@@ -1957,7 +1747,7 @@ async function handleAttachmentUpload(event) {
 
 function handleAttachmentRemove(event) {
   const attachmentId = event.currentTarget.dataset.removeAttachment;
-  if (attachmentId === BUNDLED_ATTACHMENT_ID) {
+  if (BUNDLED_ATTACHMENTS.some((attachment) => attachment.id === attachmentId)) {
     return;
   }
 
@@ -2128,17 +1918,23 @@ async function resetForm() {
 
 function buildMarkdownExport() {
   const lines = [
-    "# анкета для оценки дизайнера по карте компетенций",
+    "# анкета по карте ожиданий продуктового дизайнера",
     "",
     `- сгенерировано: ${formatTimestamp(new Date())}`,
+    `- тип ревью: ${formatField(state.profile.reviewType)}`,
     `- имя дизайнера: ${formatField(state.profile.designerName)}`,
+    `- кто заполняет: ${formatField(state.profile.filledBy)}`,
     `- период оценки: ${formatAssessmentPeriodLabel()}`,
-    `- роль дизайнера: ${formatField(state.profile.designerRole)}`,
+    `- команда / направление: ${formatField(state.profile.teamOrDirection)}`,
     `- текущий формальный грейд дизайнера: ${formatField(state.profile.currentGrade)}`,
     "",
-    "## контекст оценки",
+    "## базовая информация",
     "",
     formatParagraph(state.profile.context),
+    "",
+    "## контекст задач за период",
+    "",
+    formatParagraph(state.profile.periodTaskContext),
     "",
     "## оси оценки",
     ""
@@ -2159,10 +1955,10 @@ function buildMarkdownExport() {
       lines.push(...toMarkdownBullets(axis.prompts));
       lines.push("");
     }
-    lines.push("варианты:");
+    lines.push("уровни:");
     lines.push(
-      ...displayOptions.map(({ level, statement }, displayIndex) => {
-        const optionLabel = OPTION_LABELS[displayIndex] || String(displayIndex + 1);
+      ...displayOptions.map(({ level, statement }) => {
+        const optionLabel = String(level);
         const marker = selectedLevel === Number(level) ? "x" : " ";
         return `- [${marker}] ${optionLabel}: ${statement}`;
       })
@@ -2171,31 +1967,6 @@ function buildMarkdownExport() {
     lines.push("комментарий:");
     lines.push("");
     lines.push(formatParagraph(axisState.evidence));
-    lines.push("");
-  });
-
-  lines.push("## оценка по навыкам");
-  lines.push("");
-
-  let currentStage = "";
-  IDEAL_DESIGNER_SECTIONS.forEach((section) => {
-    const rating = state.idealRatings?.[section.id] || { score: "", comment: "" };
-    if (section.stage !== currentStage) {
-      currentStage = section.stage;
-      lines.push(`### ${currentStage}`);
-      lines.push("");
-    }
-
-    lines.push(`#### ${section.title}`);
-    lines.push("");
-    lines.push("критерии:");
-    lines.push(...toMarkdownBullets(section.bullets));
-    lines.push("");
-    lines.push(`- оценка: ${rating.score ? `${rating.score} / 5` : "не заполнено"}`);
-    lines.push("");
-    lines.push("комментарий:");
-    lines.push("");
-    lines.push(formatParagraph(rating.comment));
     lines.push("");
   });
 
@@ -2934,28 +2705,35 @@ function sanitizeAttachment(attachment, index = 0) {
     return null;
   }
 
+  const name = String(attachment.name || `документ-${index + 1}.txt`).trim() || `документ-${index + 1}.txt`;
   return {
     id: String(attachment.id || buildAttachmentId()),
-    name: String(attachment.name || `документ-${index + 1}.txt`).trim() || `документ-${index + 1}.txt`,
-    content: normalizeTextContent(attachment.content),
+    name,
+    content: normalizeStoredAttachmentContent(name, normalizeTextContent(attachment.content)),
     locked: Boolean(attachment.locked)
   };
 }
 
 async function ensureBundledDefaultAttachment() {
   try {
-    if (!bundledDefaultAttachment) {
-      const response = await fetch(BUNDLED_ATTACHMENT_URL, { cache: "no-store" });
-      if (!response.ok) {
-        throw new Error(`не удалось загрузить встроенное приложение: ${response.status}`);
-      }
+    if (!bundledDefaultAttachments.length) {
+      bundledDefaultAttachments = (
+        await Promise.all(
+          BUNDLED_ATTACHMENTS.map(async (attachment) => {
+            const response = await fetch(attachment.url, { cache: "no-store" });
+            if (!response.ok) {
+              throw new Error(`не удалось загрузить встроенное приложение: ${response.status}`);
+            }
 
-      bundledDefaultAttachment = sanitizeAttachment({
-        id: BUNDLED_ATTACHMENT_ID,
-        name: BUNDLED_ATTACHMENT_NAME,
-        content: await response.text(),
-        locked: true
-      });
+            return sanitizeAttachment({
+              id: attachment.id,
+              name: attachment.name,
+              content: await response.text(),
+              locked: true
+            });
+          })
+        )
+      ).filter(Boolean);
     }
 
     state.attachments = mergeDefaultAttachments(state.attachments);
@@ -2966,13 +2744,15 @@ async function ensureBundledDefaultAttachment() {
 
 function mergeDefaultAttachments(attachments) {
   const normalized = Array.isArray(attachments) ? attachments.map(sanitizeAttachment).filter(Boolean) : [];
-  if (!bundledDefaultAttachment) {
+  if (!bundledDefaultAttachments.length) {
     return normalized;
   }
 
   return [
-    bundledDefaultAttachment,
-    ...normalized.filter((attachment) => attachment.id !== bundledDefaultAttachment.id)
+    ...bundledDefaultAttachments,
+    ...normalized.filter(
+      (attachment) => !bundledDefaultAttachments.some((defaultAttachment) => defaultAttachment.id === attachment.id)
+    )
   ];
 }
 
@@ -2985,7 +2765,7 @@ async function readTextAttachment(file) {
   return {
     id: buildAttachmentId(),
     name: file.name || "документ.txt",
-    content: normalizeTextContent(content)
+    content: await prepareAttachmentContent(file.name || "документ.txt", normalizeTextContent(content))
   };
 }
 
@@ -2995,6 +2775,142 @@ function buildAttachmentId() {
 
 function normalizeTextContent(value) {
   return String(value || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+function normalizeStoredAttachmentContent(fileName, rawContent) {
+  return normalizeTextContent(rawContent);
+}
+
+async function prepareAttachmentContent(fileName, rawContent) {
+  const normalizedName = String(fileName || "").trim().toLowerCase();
+  const normalizedContent = normalizeTextContent(rawContent);
+  if (!shouldSemanticSummarizeJsonAttachment(normalizedName, normalizedContent)) {
+    return normalizedContent;
+  }
+  if (normalizedContent.startsWith(JSON_ATTACHMENT_SUMMARY_MARKER)) {
+    return normalizedContent;
+  }
+
+  const summarizedContent = await requestAttachmentSemanticSummary(fileName, normalizedContent);
+  return [
+    JSON_ATTACHMENT_SUMMARY_MARKER,
+    "json был сжат по смыслу через модель при загрузке.",
+    `исходный размер: ${normalizedContent.length} символов`,
+    `сжатый размер: ${summarizedContent.length} символов`,
+    "",
+    summarizedContent
+  ].join("\n");
+}
+
+function shouldSemanticSummarizeJsonAttachment(normalizedFileName, normalizedContent) {
+  if (String(normalizedFileName || "").endsWith(".json")) {
+    return true;
+  }
+
+  const trimmed = String(normalizedContent || "").trimStart();
+  return trimmed.startsWith("{") || trimmed.startsWith("[");
+}
+
+async function requestAttachmentSemanticSummary(fileName, content) {
+  if (shouldUseServerEvaluation()) {
+    try {
+      return await requestServerAttachmentSummary(fileName, content);
+    } catch (error) {
+      if (!getStoredOpenAIApiKey()) {
+        throw error;
+      }
+      return requestClientAttachmentSummary(fileName, content);
+    }
+  }
+
+  return requestClientAttachmentSummary(fileName, content);
+}
+
+async function requestServerAttachmentSummary(fileName, content) {
+  const urls = getServerAttachmentSummaryUrls();
+  let lastError = null;
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          file_name: fileName,
+          content
+        })
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || `не удалось сжать json. статус ответа: ${response.status}`);
+      }
+
+      const summarizedContent = String(payload.content || "").trim();
+      if (!summarizedContent) {
+        throw new Error("OpenAI не вернул смысловую выжимку по JSON.");
+      }
+
+      return summarizedContent;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("не удалось сжать json.");
+}
+
+function getServerAttachmentSummaryUrls() {
+  const host = String(window.location.hostname || "").trim().toLowerCase();
+  if (host === "127.0.0.1" || host === "localhost") {
+    return [SERVER_ATTACHMENT_SUMMARY_URL, REMOTE_SERVER_ATTACHMENT_SUMMARY_URL];
+  }
+  return [SERVER_ATTACHMENT_SUMMARY_URL];
+}
+
+async function requestClientAttachmentSummary(fileName, content) {
+  const apiKey = await getOpenAIApiKey();
+  const response = await fetch(OPENAI_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      instructions: [
+        "ты делаешь смысловую выжимку загруженного JSON-файла для последующей оценки продуктового дизайнера.",
+        "",
+        "если JSON похож на архив рабочей переписки, чатов, комментариев, тредов или логов общения:",
+        "- сделай короткое summary переписки за период",
+        "- выдели участников, основные темы, важные решения и сигналы про самостоятельность, качество вопросов, аргументацию, ownership, инициативность, влияние на решения, устойчивость в коммуникации, работу с неопределенностью и отношение к обратной связи",
+        "",
+        "если это не переписка, а другой JSON:",
+        "- кратко объясни, что это за данные",
+        "- выдели ключевые сущности, события и наблюдения, полезные для оценки дизайнера",
+        "",
+        "правила:",
+        "- отвечай на русском",
+        "- верни компактный markdown",
+        "- не вставляй большие цитаты и не выводи сырой JSON"
+      ].join("\n"),
+      input: `имя файла: ${fileName}\n\njson:\n${content}`
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(extractOpenAIErrorMessage(payload, response.status));
+  }
+
+  const summarizedContent = extractEvaluationText(payload);
+  if (!summarizedContent) {
+    throw new Error("OpenAI не вернул смысловую выжимку по JSON.");
+  }
+
+  return summarizedContent;
 }
 
 function downloadTextFile(fileName, content, mimeType) {

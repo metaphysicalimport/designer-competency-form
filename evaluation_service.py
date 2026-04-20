@@ -2,6 +2,7 @@ import json
 import os
 import re
 from datetime import datetime, timezone
+from http.client import RemoteDisconnected
 from html import unescape
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
@@ -18,7 +19,10 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_MODEL = "gpt-5-pro"
 OPENAI_LARGE_INPUT_MODEL = "gpt-5-pro"
 OPENAI_MODEL_SWITCH_INPUT_TOKENS = max(1000, int(os.environ.get("OPENAI_MODEL_SWITCH_INPUT_TOKENS", "30000")))
+OPENAI_ATTACHMENT_SUMMARY_MODEL = os.environ.get("OPENAI_ATTACHMENT_SUMMARY_MODEL", OPENAI_MODEL).strip() or OPENAI_MODEL
 OPENAI_API_URL = "https://api.openai.com/v1/responses"
+ATTACHMENT_SUMMARY_CHUNK_CHARS = max(4000, int(os.environ.get("ATTACHMENT_SUMMARY_CHUNK_CHARS", "45000")))
+ATTACHMENT_SUMMARY_MAX_CHUNKS = max(1, int(os.environ.get("ATTACHMENT_SUMMARY_MAX_CHUNKS", "8")))
 
 YANDEX_TRACKER_TOKEN = os.environ.get("YANDEX_TRACKER_TOKEN", "")
 YANDEX_TRACKER_SERVICE_TICKET = os.environ.get("YANDEX_TRACKER_SERVICE_TICKET", "").strip()
@@ -63,7 +67,13 @@ YANDEX_TRACKER_EXCLUDED_TYPE_NAMES = {
 }
 
 EVALUATION_INSTRUCTIONS = """
-проанализируй содержимое анкеты, критерии карты компетенции и данные из Яндекс Трекера, если они приложены, и подготовь оценку дизайнера, его грейд и точки роста.
+проанализируй содержимое анкеты по карте ожиданий дизайнера, саму карту ожиданий и данные из Яндекс Трекера, если они приложены, и подготовь оценку дизайнера, его грейд и точки роста.
+
+главный инструмент калибровки - карта ожиданий. смотри на устойчивые поведенческие паттерны, а не на единичные сильные кейсы. устойчивый паттерн - это минимум 3 кейса с использованием скилла или способа работы.
+
+не завышай оценку из-за участия в большой инициативе, если дизайнер не определял рамку, решение, направление или реальный масштаб влияния.
+
+разные оси могут быть на разных уровнях. итоговую калибровку собирай по общему паттерну, а не по одному сильному или слабому пункту.
 
 используй данные из Трекера как дополнительный сигнал, а не как единственный источник истины. смотри на сложность, масштаб, тип задач, повторяемость вкладов, продуктовый контекст, качество формулировок и косвенные сигналы зрелости. не делай вывод только по количеству задач.
 
@@ -85,6 +95,8 @@ EVALUATION_INSTRUCTIONS = """
 
 ## обоснование грейда
 
+## разбор по осям
+
 ## сигналы из Яндекс Трекера
 
 ## инсайты
@@ -96,6 +108,46 @@ EVALUATION_INSTRUCTIONS = """
 ## риски и пробелы в данных
 
 ## рекомендации для следующего шага
+""".strip()
+
+ATTACHMENT_SUMMARY_INSTRUCTIONS = """
+ты делаешь смысловую выжимку загруженного JSON-файла для последующей оценки продуктового дизайнера.
+
+если JSON похож на архив рабочей переписки, чатов, комментариев, тредов или логов общения:
+- не пересказывай файл целиком и не копируй JSON-структуру
+- сделай короткое summary переписки за период
+- выдели период, участников, основные темы, важные решения, повторы, конфликты или точки согласования
+- отдельно вытащи сигналы про самостоятельность, качество вопросов, аргументацию, ownership, инициативность, влияние на решения, устойчивость в коммуникации, работу с неопределенностью и отношение к обратной связи
+
+если это не переписка, а другой JSON:
+- кратко объясни, что это за данные
+- выдели ключевые сущности, события, статусы, таймлайн и наблюдения, которые полезны для оценки дизайнера
+
+правила:
+- отвечай на русском
+- верни компактный markdown
+- целевой объем: 500-1800 слов
+- не вставляй большие цитаты и не выводи сырой JSON
+- если это только часть файла, явно учитывай, что перед тобой фрагмент, и не делай лишних уверенных выводов
+""".strip()
+
+ATTACHMENT_SUMMARY_MERGE_INSTRUCTIONS = """
+ты объединяешь несколько частичных смысловых summary одного большого JSON-файла в одно финальное краткое summary.
+
+если это архив рабочей переписки:
+- собери единое summary переписки за период
+- убери повторы
+- сохрани только важные наблюдения, темы, решения и сигналы для оценки дизайнера
+
+если это другой JSON:
+- собери сжатое и цельное описание данных
+- оставь только самое полезное для последующей оценки дизайнера
+
+правила:
+- отвечай на русском
+- верни компактный markdown
+- не упоминай номера чанков
+- не цитируй большие фрагменты исходных summary
 """.strip()
 
 
@@ -136,6 +188,45 @@ def evaluate_designer(
     }
 
 
+def summarize_attachment_content(file_name, content):
+    normalized_name = str(file_name or "").strip() or "attachment.json"
+    normalized_content = str(content or "").strip()
+    if not normalized_content:
+        raise ValueError("Пустой файл. Нечего сжимать.")
+
+    if not OPENAI_API_KEY:
+        raise RuntimeError("На сервере не настроен OPENAI_API_KEY.")
+
+    chunks = split_attachment_content(normalized_content)
+    partial_summaries = []
+    total_chunks = len(chunks)
+
+    for index, chunk in enumerate(chunks, start=1):
+        partial_summaries.append(
+            request_openai_text(
+                instructions=ATTACHMENT_SUMMARY_INSTRUCTIONS,
+                input_text=build_attachment_summary_input(
+                    file_name=normalized_name,
+                    chunk_text=chunk,
+                    chunk_index=index,
+                    total_chunks=total_chunks,
+                ),
+                model_name=OPENAI_ATTACHMENT_SUMMARY_MODEL,
+                empty_error_message="OpenAI не вернул текст выжимки по JSON.",
+            )
+        )
+
+    if len(partial_summaries) == 1:
+        return partial_summaries[0]
+
+    return request_openai_text(
+        instructions=ATTACHMENT_SUMMARY_MERGE_INSTRUCTIONS,
+        input_text=build_attachment_summary_merge_input(normalized_name, partial_summaries),
+        model_name=OPENAI_ATTACHMENT_SUMMARY_MODEL,
+        empty_error_message="OpenAI не вернул финальную выжимку по JSON.",
+    )
+
+
 def should_try_server_tracker_lookup(designer_name="", tracker_login=""):
     if not (designer_name or tracker_login):
         return False
@@ -164,6 +255,69 @@ def build_openai_input(card_markdown, tracker_context, tracker_warning=""):
         )
 
     return "\n".join(sections).strip()
+
+
+def build_attachment_summary_input(file_name, chunk_text, chunk_index, total_chunks):
+    return "\n".join(
+        [
+            f"имя файла: {file_name}",
+            f"часть файла: {chunk_index} из {total_chunks}",
+            "",
+            "json или его фрагмент:",
+            chunk_text.strip(),
+        ]
+    ).strip()
+
+
+def build_attachment_summary_merge_input(file_name, partial_summaries):
+    sections = [f"имя файла: {file_name}", "", "частичные summary:"]
+    for index, partial_summary in enumerate(partial_summaries, start=1):
+        sections.extend(
+            [
+                "",
+                f"## часть {index}",
+                "",
+                str(partial_summary or "").strip(),
+            ]
+        )
+    return "\n".join(sections).strip()
+
+
+def split_attachment_content(content):
+    normalized = str(content or "").strip()
+    if not normalized:
+        return []
+
+    chunks = []
+    start = 0
+    max_length = max(1, ATTACHMENT_SUMMARY_CHUNK_CHARS)
+
+    while start < len(normalized) and len(chunks) < ATTACHMENT_SUMMARY_MAX_CHUNKS:
+        end = min(len(normalized), start + max_length)
+        if end < len(normalized):
+            split_at = max(
+                normalized.rfind("\n", start, end),
+                normalized.rfind("},", start, end),
+                normalized.rfind("],", start, end),
+                normalized.rfind('"}', start, end),
+            )
+            if split_at > start + max_length // 3:
+                end = split_at + 1
+
+        chunk = normalized[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
+        start = end
+
+    if start < len(normalized):
+        tail = normalized[start:].strip()
+        if tail:
+            if chunks:
+                chunks[-1] = f"{chunks[-1]}\n{tail}".strip()
+            else:
+                chunks.append(tail)
+
+    return chunks
 
 
 def build_tracker_context(designer_name="", tracker_login=""):
@@ -289,10 +443,27 @@ def build_tracker_context_via_proxy(designer_name="", tracker_login=""):
 
 def request_openai_evaluation(evaluation_input):
     model_name = select_openai_model(evaluation_input)
+    return request_openai_text(
+        instructions=EVALUATION_INSTRUCTIONS,
+        input_text=evaluation_input,
+        model_name=model_name,
+        empty_error_message="OpenAI не вернул текст оценки.",
+        allow_large_input_hint=True,
+    )
+
+
+def request_openai_text(
+    instructions,
+    input_text,
+    model_name="",
+    empty_error_message="OpenAI не вернул текст ответа.",
+    allow_large_input_hint=False,
+):
+    normalized_model = str(model_name or OPENAI_MODEL).strip() or OPENAI_MODEL
     request_payload = {
-        "model": model_name,
-        "instructions": EVALUATION_INSTRUCTIONS,
-        "input": evaluation_input,
+        "model": normalized_model,
+        "instructions": str(instructions or "").strip(),
+        "input": str(input_text or "").strip(),
     }
 
     request = Request(
@@ -310,19 +481,26 @@ def request_openai_evaluation(evaluation_input):
             response_body = response.read().decode("utf-8")
     except HTTPError as error:
         details = error.read().decode("utf-8", errors="replace")
-        if error.code == 429 and "rate_limit_exceeded" in details and model_name == OPENAI_LARGE_INPUT_MODEL:
+        if (
+            allow_large_input_hint
+            and error.code == 429
+            and "rate_limit_exceeded" in details
+            and normalized_model == OPENAI_LARGE_INPUT_MODEL
+        ):
             raise RuntimeError(
                 "Запрос слишком большой даже после переключения на long-context модель. Нужно уменьшить объем входных данных: "
                 "сократить result.json, вложения или контекст из Трекера."
             )
         raise RuntimeError(f"OpenAI вернул ошибку {error.code}: {details}")
+    except RemoteDisconnected:
+        raise RuntimeError("OpenAI разорвал соединение до ответа. Попробуй еще раз.")
     except URLError as error:
         raise RuntimeError(f"Не удалось подключиться к OpenAI: {error.reason}")
 
     parsed = json.loads(response_body)
     output_text = extract_output_text(parsed).strip()
     if not output_text:
-        raise RuntimeError("OpenAI не вернул текст оценки.")
+        raise RuntimeError(empty_error_message)
 
     return output_text
 
