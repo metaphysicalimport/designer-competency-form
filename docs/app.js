@@ -82,6 +82,8 @@ const TRASH_ICON = `
 const EVALUATION_INSTRUCTIONS = `
 проанализируй содержимое анкеты по карте ожиданий дизайнера, саму карту ожиданий и подготовь оценку дизайнера, его грейд и точки роста.
 
+блок "мастерство дизайнера" используй как дополнительный диагностический слой. он помогает точнее описать сильные стороны и зоны роста, но не должен сам по себе определять итоговый грейд.
+
 главный инструмент калибровки - карта ожиданий. смотри на устойчивые поведенческие паттерны, а не на единичные сильные кейсы. устойчивый паттерн - это минимум 3 кейса с использованием скилла или способа работы.
 
 не завышай оценку из-за участия в большой инициативе, если дизайнер не определял рамку, решение, направление или реальный масштаб влияния.
@@ -244,6 +246,109 @@ const AXES = [
   }
 ];
 
+const DESIGN_MASTERY_SECTIONS = [
+  {
+    id: "solution_generation",
+    stage: "дискавери этап",
+    title: "генерация решений и сценарное мышление",
+    bullets: [
+      "умеет смотреть на задачу целиком, а не только на отдельный экран",
+      "предлагает несколько осмысленных вариантов решения, а не первый очевидный",
+      "видит последствия решений в соседних состояниях, переходах и флоу"
+    ]
+  },
+  {
+    id: "aesthetics",
+    stage: "дискавери этап",
+    title: "эстетика",
+    bullets: [
+      "чувствует визуальную планку продукта и умеет собирать цельные, аккуратные и выразительные интерфейсы",
+      "работает с типографикой, цветом, композицией, ритмом и компонентами как с частью качества решения",
+      "думает не только про функциональность, но и про look and feel"
+    ]
+  },
+  {
+    id: "user_research",
+    stage: "дискавери этап",
+    title: "юзер ресерч",
+    bullets: [
+      "умеет сформулировать, что именно нужно проверить и зачем",
+      "может собрать базовый план ресерча: гипотезы, формат, вопросы, сценарий",
+      "переводит результаты ресерча в рекомендации для продукта и дизайна"
+    ]
+  },
+  {
+    id: "product_thinking",
+    stage: "дискавери этап",
+    title: "продуктовое мышление и аналитика",
+    bullets: [
+      "связывает дизайн-решения с целями продукта, пользовательской ценностью и метриками",
+      "понимает, какие данные помогают принять решение, и умеет на них опираться",
+      "видит не только качество интерфейса, но и влияние решения на продукт целиком"
+    ]
+  },
+  {
+    id: "design_pitching",
+    stage: "дискавери этап",
+    title: "дизайн-питчинг",
+    bullets: [
+      "умеет ясно объяснять логику своих решений",
+      "может защищать решение через аргументы, а не через вкус",
+      "умеет обсуждать альтернативы и ограничения без потери сути решения"
+    ]
+  },
+  {
+    id: "feedback_and_collaboration",
+    stage: "дискавери этап",
+    title: "эмпатия, компромиссы и работа с фидбэком",
+    bullets: [
+      "слышит ограничения команды и продукта, не теряя планку качества",
+      "спокойно принимает фидбэк и умеет переосмыслять решение, если аргументы сильные",
+      "ищет рабочий компромисс, который сохраняет смысл решения"
+    ]
+  },
+  {
+    id: "work_speed",
+    stage: "деливери этап",
+    title: "эффективность работы",
+    bullets: [
+      "двигается с хорошей скоростью без заметной просадки по качеству",
+      "умеет выбирать нужную глубину проработки",
+      "держит темп на дистанции, а не только в режиме разового рывка"
+    ]
+  },
+  {
+    id: "flow_detailing",
+    stage: "деливери этап",
+    title: "проработка флоу и системность",
+    bullets: [
+      "прорабатывает основные и пограничные сценарии, состояния и ошибки",
+      "думает о связности флоу, а не только о хэппи-пассе",
+      "передает решение в разработку в полном и понятном виде"
+    ]
+  },
+  {
+    id: "handoff_and_production",
+    stage: "деливери этап",
+    title: "хэнд-офф и ответственность за прод",
+    bullets: [
+      "не считает задачу законченной на этапе макетов",
+      "сопровождает решение в разработке и участвует в дизайн-ревью",
+      "держит ответственность за качество решения до момента, когда оно реально заработало в продукте"
+    ]
+  },
+  {
+    id: "shared_contribution",
+    stage: "общее дело",
+    title: "общее дело",
+    bullets: [
+      "вклад в общую планку качества",
+      "развитие способов работы и усиление других дизайнеров",
+      "инициативы, которые улучшают систему, а не только локальный результат"
+    ]
+  }
+];
+
 const DEFAULT_STATE = {
   profile: {
     reviewType: "",
@@ -266,6 +371,15 @@ const DEFAULT_STATE = {
         selectedStatement: "",
         selectedStatements: [],
         evidence: ""
+      }
+    ])
+  ),
+  designMastery: Object.fromEntries(
+    DESIGN_MASTERY_SECTIONS.map((section) => [
+      section.id,
+      {
+        score: "",
+        comment: ""
       }
     ])
   ),
@@ -325,6 +439,10 @@ function loadState() {
         ...cloneDefaultState().axes,
         ...(parsed.axes || {})
       },
+      designMastery: {
+        ...cloneDefaultState().designMastery,
+        ...(parsed.designMastery || {})
+      },
       voiceDrafts: {
         ...cloneDefaultState().voiceDrafts,
         ...(parsed.voiceDrafts || {})
@@ -371,6 +489,7 @@ function persistState() {
     ...state,
     profile: { ...state.profile },
     axes: JSON.parse(JSON.stringify(state.axes)),
+    designMastery: JSON.parse(JSON.stringify(state.designMastery)),
     evaluation: { ...state.evaluation },
     attachments: JSON.parse(JSON.stringify(state.attachments || [])),
     optionOrder: JSON.parse(JSON.stringify(state.optionOrder))
@@ -387,12 +506,16 @@ function persistState() {
 }
 
 function getAnsweredCount() {
-  return AXES.filter((axis) => Number(state.axes[axis.id].selectedLevel) >= 14).length;
+  const axesCount = AXES.filter((axis) => Number(state.axes[axis.id].selectedLevel) >= 14).length;
+  const masteryCount = DESIGN_MASTERY_SECTIONS.filter(
+    (section) => Number(state.designMastery?.[section.id]?.score) >= 1
+  ).length;
+  return axesCount + masteryCount;
 }
 
 function render() {
   const answeredCount = getAnsweredCount();
-  const totalCount = AXES.length;
+  const totalCount = AXES.length + DESIGN_MASTERY_SECTIONS.length;
   const progress = Math.round((answeredCount / totalCount) * 100);
 
   app.innerHTML = `
@@ -457,6 +580,12 @@ function render() {
     </section>
 
     ${AXES.map(renderAxisCard).join("")}
+
+    <section class="section-divider">
+      <h2 class="section-divider-title">мастерство дизайнера</h2>
+    </section>
+
+    ${renderDesignMasterySections()}
 
     <section class="profile-card">
       ${renderCommentField({
@@ -779,6 +908,70 @@ function renderAxisCard(axis, index) {
   `;
 }
 
+function renderDesignMasterySections() {
+  const grouped = DESIGN_MASTERY_SECTIONS.reduce((accumulator, section) => {
+    if (!accumulator[section.stage]) {
+      accumulator[section.stage] = [];
+    }
+    accumulator[section.stage].push(section);
+    return accumulator;
+  }, {});
+
+  return Object.entries(grouped)
+    .map(
+      ([stage, sections]) => `
+        <section class="profile-card">
+          <h2 class="subsection-title">${escapeHtml(stage)}</h2>
+          <div class="ideal-stack">
+            ${sections.map(renderDesignMasteryCard).join("")}
+          </div>
+        </section>
+      `
+    )
+    .join("");
+}
+
+function renderDesignMasteryCard(section) {
+  const masteryState = state.designMastery?.[section.id] || { score: "", comment: "" };
+
+  return `
+    <section class="rating-card">
+      <div class="rating-card-head">
+        <h3>${escapeHtml(section.title)}</h3>
+      </div>
+      <ul class="axis-prompts">
+        ${section.bullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join("")}
+      </ul>
+      <div class="score-row">
+        ${[1, 2, 3, 4, 5]
+          .map((score) => {
+            const isSelected = Number(masteryState.score) === score;
+            return `
+              <label class="score-pill ${isSelected ? "is-selected" : ""}">
+                <input
+                  type="radio"
+                  name="mastery-${section.id}"
+                  value="${score}"
+                  data-mastery-section="${section.id}"
+                  ${isSelected ? "checked" : ""}
+                />
+                <span>${score}</span>
+              </label>
+            `;
+          })
+          .join("")}
+      </div>
+      ${renderCommentField({
+        fieldId: `mastery-comment-${section.id}`,
+        label: "комментарий по мастерству",
+        value: masteryState.comment,
+        placeholder: "опиши, почему поставлена такая оценка по этому аспекту мастерства.",
+        textareaAttributes: `data-mastery-comment="${section.id}"`
+      })}
+    </section>
+  `;
+}
+
 function renderEvaluateAction() {
   const evaluation = state.evaluation || cloneDefaultState().evaluation;
 
@@ -884,6 +1077,14 @@ function attachEvents() {
     node.addEventListener("input", handleEvidenceInput);
   });
 
+  document.querySelectorAll('input[type="radio"][data-mastery-section]').forEach((node) => {
+    node.addEventListener("change", handleMasteryScoreChange);
+  });
+
+  document.querySelectorAll("[data-mastery-comment]").forEach((node) => {
+    node.addEventListener("input", handleMasteryCommentInput);
+  });
+
   document.querySelectorAll('input[type="radio"][data-axis]').forEach((node) => {
     node.addEventListener("change", handleAxisSelectionChange);
   });
@@ -982,6 +1183,25 @@ function handleTrackerTokenClear() {
 function handleEvidenceInput(event) {
   const axisId = event.target.dataset.evidenceAxis;
   state.axes[axisId].evidence = event.target.value;
+  state.error = "";
+  clearEvaluationResult();
+  if (!persistState()) {
+    render();
+  }
+}
+
+function handleMasteryScoreChange(event) {
+  const sectionId = event.target.dataset.masterySection;
+  state.designMastery[sectionId].score = Number(event.target.value);
+  state.error = "";
+  clearEvaluationResult();
+  persistState();
+  render();
+}
+
+function handleMasteryCommentInput(event) {
+  const sectionId = event.target.dataset.masteryComment;
+  state.designMastery[sectionId].comment = event.target.value;
   state.error = "";
   clearEvaluationResult();
   if (!persistState()) {
@@ -1681,6 +1901,17 @@ function applyTranscriptToComment(fieldId, transcript) {
     if (state.axes[axisId]) {
       state.axes[axisId].evidence = appendTranscript(state.axes[axisId].evidence, normalizedTranscript);
     }
+    return;
+  }
+
+  if (fieldId.startsWith("mastery-comment-")) {
+    const sectionId = fieldId.replace("mastery-comment-", "");
+    if (state.designMastery[sectionId]) {
+      state.designMastery[sectionId].comment = appendTranscript(
+        state.designMastery[sectionId].comment,
+        normalizedTranscript
+      );
+    }
   }
 }
 
@@ -1967,6 +2198,31 @@ function buildMarkdownExport() {
     lines.push("комментарий:");
     lines.push("");
     lines.push(formatParagraph(axisState.evidence));
+    lines.push("");
+  });
+
+  lines.push("## мастерство дизайнера");
+  lines.push("");
+
+  let currentStage = "";
+  DESIGN_MASTERY_SECTIONS.forEach((section) => {
+    const mastery = state.designMastery?.[section.id] || { score: "", comment: "" };
+    if (section.stage !== currentStage) {
+      currentStage = section.stage;
+      lines.push(`### ${currentStage}`);
+      lines.push("");
+    }
+
+    lines.push(`#### ${section.title}`);
+    lines.push("");
+    lines.push("критерии:");
+    lines.push(...toMarkdownBullets(section.bullets));
+    lines.push("");
+    lines.push(`- оценка: ${mastery.score ? `${mastery.score} / 5` : "не заполнено"}`);
+    lines.push("");
+    lines.push("комментарий:");
+    lines.push("");
+    lines.push(formatParagraph(mastery.comment));
     lines.push("");
   });
 
